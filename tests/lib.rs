@@ -2,9 +2,12 @@ extern crate concepts_pl;
 
 use concepts_pl::derive;
 
-use std::str;
+use std::{fs, str};
 
-fn run_test(judgement: &str, expect: &str) {
+fn run_test(judgement: &str, expect_filepath: &str) {
+    let expect: String =
+        fs::read_to_string(expect_filepath).expect("something went wrong reading the file.");
+
     let mut buf = Vec::<u8>::new();
     let _ = derive(judgement, &mut buf);
     let actual = str::from_utf8(&buf).expect("expects result str");
@@ -15,13 +18,27 @@ fn run_test(judgement: &str, expect: &str) {
 #[test]
 fn test_question1() {
     let judgement = "Z plus Z is Z";
-    let expect = "Z plus Z is Z by P-Zero {}";
+    let expect = "tests/expects/question1";
     run_test(judgement, expect);
 }
 
 #[test]
 fn test_question2() {
     let judgement = "Z plus S(S(Z)) is S(S(Z))";
-    let expect = "Z plus S(S(Z)) is S(S(Z)) by P-Zero {}";
+    let expect = "tests/expects/question2";
+    run_test(judgement, expect);
+}
+
+#[test]
+fn test_question3() {
+    let judgement = "S(S(Z)) plus Z is S(S(Z))";
+    let expect = "tests/expects/question3";
+    run_test(judgement, expect);
+}
+
+#[test]
+fn test_question4() {
+    let judgement = "S(Z) plus S(S(S(Z))) is S(S(S(S(Z))))";
+    let expect = "tests/expects/question4";
     run_test(judgement, expect);
 }
