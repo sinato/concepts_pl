@@ -72,6 +72,13 @@ impl Tokens {
         }
         cnt
     }
+    pub fn consume_operator(&mut self) -> String {
+        if let Some(Token::Op(op, _)) = self.pop() {
+            op
+        } else {
+            panic!("expects an operator")
+        }
+    }
 }
 
 pub struct Lexer {
@@ -84,7 +91,7 @@ impl Lexer {
     pub fn new() -> Lexer {
         let token_patterns = vec![
             ("ZERO", r"Z"),
-            ("OP", r"plus"),
+            ("OP", r"(plus)|(times)"),
             ("EQ", r"is"),
             ("PS", r"S\("),
             ("PE", r"\)"),
