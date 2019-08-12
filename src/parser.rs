@@ -1,4 +1,4 @@
-use crate::lexer::{Token, Tokens};
+use crate::lexer::Tokens;
 use std::io::{self, Write};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -26,17 +26,27 @@ impl PZeroNode {
     fn new(tokens: &mut Tokens) -> PZeroNode {
         tokens.pop(); // consume Z
         tokens.pop(); // consume plus
-        let nat_num: usize = if let Some(Token::Zero(_)) = tokens.pop() {
-            0
-        } else {
-            panic!("")
-        }; // consume num
+        let nat_num: usize = tokens.consume_peano_num(); // consume num
         tokens.pop(); // consume is
         tokens.pop(); // consume Z
         PZeroNode { nat_num }
     }
 
     fn show<W: Write>(self, w: &mut W) -> io::Result<()> {
-        write!(w, "Z plus {} is Z by P-Zero {{}}", "Z")
+        let n = get_peano_num(self.nat_num);
+        write!(w, "Z plus {} is {} by P-Zero {{}}", n, n)
     }
+}
+
+fn get_peano_num(nat_num: usize) -> String {
+    let mut s = "".to_string();
+
+    for _ in 0..nat_num {
+        s += "S(";
+    }
+    s += "Z";
+    for _ in 0..nat_num {
+        s += ")";
+    }
+    s
 }

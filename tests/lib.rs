@@ -18,3 +18,10 @@ fn test_question1() {
     let expect = "Z plus Z is Z by P-Zero {}";
     run_test(judgement, expect);
 }
+
+#[test]
+fn test_question2() {
+    let judgement = "Z plus S(S(Z)) is S(S(Z))";
+    let expect = "Z plus S(S(Z)) is S(S(Z)) by P-Zero {}";
+    run_test(judgement, expect);
+}

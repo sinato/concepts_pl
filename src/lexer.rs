@@ -13,12 +13,14 @@ pub struct DebugInfo {
 pub enum Token {
     Zero(DebugInfo),
     Equal(DebugInfo),
+    Ps(DebugInfo),
+    Pe(DebugInfo),
     Op(String, DebugInfo),
 }
 impl Token {
     pub fn get_debug_info(self, filename: &str) -> String {
         let debug_info = match self.clone() {
-            Token::Zero(d) | Token::Equal(d) => d,
+            Token::Zero(d) | Token::Equal(d) | Token::Pe(d) | Token::Ps(d) => d,
             Token::Op(_, d) => d,
         };
         let mut file = File::open(filename).unwrap();
@@ -52,6 +54,24 @@ impl Tokens {
     pub fn reverse(&mut self) {
         self.tokens.reverse()
     }
+    pub fn consume_peano_num(&mut self) -> usize {
+        let mut now_cnt = 0;
+        let mut cnt = 0;
+        while let Some(token) = self.pop() {
+            match token {
+                Token::Ps(_) => {
+                    now_cnt += 1;
+                    cnt += 1;
+                }
+                Token::Pe(_) => now_cnt -= 1,
+                _ => (),
+            }
+            if now_cnt == 0 {
+                break;
+            }
+        }
+        cnt
+    }
 }
 
 pub struct Lexer {
@@ -62,7 +82,13 @@ pub struct Lexer {
 impl Lexer {
     // static constructor
     pub fn new() -> Lexer {
-        let token_patterns = vec![("ZERO", r"Z"), ("OP", r"plus"), ("EQ", r"is")];
+        let token_patterns = vec![
+            ("ZERO", r"Z"),
+            ("OP", r"plus"),
+            ("EQ", r"is"),
+            ("PS", r"S\("),
+            ("PE", r"\)"),
+        ];
         let re = make_regex(&token_patterns);
         let names = get_names(&token_patterns);
         let re = Regex::new(&re).expect("something went wrong making the regex");
@@ -99,6 +125,8 @@ impl Lexer {
                 "ZERO" => tokens.push(Token::Zero(debug_info)),
                 "OP" => tokens.push(Token::Op(val, debug_info)),
                 "EQ" => tokens.push(Token::Equal(debug_info)),
+                "PS" => tokens.push(Token::Ps(debug_info)),
+                "PE" => tokens.push(Token::Pe(debug_info)),
                 _ => panic!("unexpected type token"),
             }
         }
