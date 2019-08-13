@@ -36,14 +36,14 @@ fn get_rule_times(n1: usize, n2: usize, n3: usize) -> RuleNode {
     if n1 == 0 {
         RuleNode::TZero(TZeroNode { nat_num: n2 })
     } else {
-        let premise1 = get_rule_times(n1 - 1, n2, n3 - n2);
-        let premise2 = get_rule_plus(n2, n3 - n2, n3);
+        let premise1 = Box::new(get_rule_times(n1 - 1, n2, n3 - n2));
+        let premise2 = Box::new(get_rule_plus(n2, n3 - n2, n3));
         RuleNode::TSucc(TSuccNode {
-            nat_n1: n1,
-            nat_n2: n2,
-            nat_n3: n3,
-            premise1: Box::new(premise1),
-            premise2: Box::new(premise2),
+            n1,
+            n2,
+            n3,
+            premise1,
+            premise2,
         })
     }
 }
@@ -54,9 +54,9 @@ fn get_rule_plus(n1: usize, n2: usize, n3: usize) -> RuleNode {
     } else {
         let premise = get_rule_plus(n1 - 1, n2, n3 - 1);
         RuleNode::PSucc(PSuccNode {
-            nat_n1: n1,
-            nat_n2: n2,
-            nat_n3: n3,
+            n1,
+            n2,
+            n3,
             premise: Box::new(premise),
         })
     }
@@ -77,16 +77,16 @@ impl PZeroNode {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct PSuccNode {
-    nat_n1: usize,
-    nat_n2: usize,
-    nat_n3: usize,
+    n1: usize,
+    n2: usize,
+    n3: usize,
     premise: Box<RuleNode>,
 }
 impl PSuccNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let n1 = get_peano_num(self.nat_n1);
-        let n2 = get_peano_num(self.nat_n2);
-        let n3 = get_peano_num(self.nat_n3);
+        let n1 = get_peano_num(self.n1);
+        let n2 = get_peano_num(self.n2);
+        let n3 = get_peano_num(self.n3);
         let _ = write!(
             w,
             "{}{} plus {} is {} by P-Succ {{\n",
@@ -116,17 +116,17 @@ impl TZeroNode {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TSuccNode {
-    nat_n1: usize,
-    nat_n2: usize,
-    nat_n3: usize,
+    n1: usize,
+    n2: usize,
+    n3: usize,
     premise1: Box<RuleNode>,
     premise2: Box<RuleNode>,
 }
 impl TSuccNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let n1 = get_peano_num(self.nat_n1);
-        let n2 = get_peano_num(self.nat_n2);
-        let n3 = get_peano_num(self.nat_n3);
+        let n1 = get_peano_num(self.n1);
+        let n2 = get_peano_num(self.n2);
+        let n3 = get_peano_num(self.n3);
         let _ = write!(
             w,
             "{}{} times {} is {} by T-Succ {{\n",
