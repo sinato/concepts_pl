@@ -16,13 +16,20 @@ pub enum Token {
     Ps(DebugInfo),
     Pe(DebugInfo),
     Op(String, DebugInfo),
+    OpC(String, DebugInfo),
     Lt(DebugInfo),
+    Eval(DebugInfo),
 }
 impl Token {
     pub fn get_debug_info(self, filename: &str) -> String {
         let debug_info = match self.clone() {
-            Token::Lt(d) | Token::Zero(d) | Token::Equal(d) | Token::Pe(d) | Token::Ps(d) => d,
-            Token::Op(_, d) => d,
+            Token::Lt(d)
+            | Token::Eval(d)
+            | Token::Zero(d)
+            | Token::Equal(d)
+            | Token::Pe(d)
+            | Token::Ps(d) => d,
+            Token::Op(_, d) | Token::OpC(_, d) => d,
         };
         let mut file = File::open(filename).unwrap();
         let mut contents = String::new();
@@ -93,10 +100,12 @@ impl Lexer {
         let token_patterns = vec![
             ("ZERO", r"Z"),
             ("OP", r"(plus)|(times)"),
+            ("OPC", r"\+|\*"),
             ("LT", r"is less than"),
             ("EQ", r"is"),
             ("PS", r"S\("),
             ("PE", r"\)"),
+            ("EVAL", r"evalto"),
         ];
         let re = make_regex(&token_patterns);
         let names = get_names(&token_patterns);
@@ -133,10 +142,12 @@ impl Lexer {
             match typ.as_ref() {
                 "ZERO" => tokens.push(Token::Zero(debug_info)),
                 "OP" => tokens.push(Token::Op(val, debug_info)),
+                "OPC" => tokens.push(Token::OpC(val, debug_info)),
                 "LT" => tokens.push(Token::Lt(debug_info)),
                 "EQ" => tokens.push(Token::Equal(debug_info)),
                 "PS" => tokens.push(Token::Ps(debug_info)),
                 "PE" => tokens.push(Token::Pe(debug_info)),
+                "EVAL" => tokens.push(Token::Eval(debug_info)),
                 _ => panic!("unexpected type token"),
             }
         }

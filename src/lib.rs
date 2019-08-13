@@ -2,6 +2,7 @@ pub mod lexer;
 pub mod parser_compnat1;
 pub mod parser_compnat2;
 pub mod parser_compnat3;
+pub mod parser_evalnatexp;
 pub mod parser_nat;
 pub mod util;
 
@@ -9,6 +10,7 @@ use crate::lexer::Lexer;
 use parser_compnat1::RuleNode as CompNat1;
 use parser_compnat2::RuleNode as CompNat2;
 use parser_compnat3::RuleNode as CompNat3;
+use parser_evalnatexp::RuleNode as EvalNatExp;
 use parser_nat::RuleNode as Nat;
 
 use std::io::{self, Write};
@@ -18,6 +20,7 @@ pub enum DerivationRules {
     CompNat1,
     CompNat2,
     CompNat3,
+    EvalNatExp,
 }
 
 pub fn derive<W: Write>(
@@ -43,6 +46,10 @@ pub fn derive<W: Write>(
         }
         DerivationRules::CompNat3 => {
             let node = CompNat3::new(&mut tokens);
+            node.show(w, 0, true)
+        }
+        DerivationRules::EvalNatExp => {
+            let node = EvalNatExp::new(&mut tokens);
             node.show(w, 0, true)
         }
     }
