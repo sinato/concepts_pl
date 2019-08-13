@@ -5,7 +5,7 @@ use concepts_pl::derive;
 use std::io;
 
 fn main() {
-    let judgement = "Z times S(S(Z)) is Z";
+    let judgement = "S(S(Z)) times S(Z) is S(S(Z))";
 
     println!("judgement ========================");
     println!("{}", judgement);

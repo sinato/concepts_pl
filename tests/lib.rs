@@ -49,3 +49,17 @@ fn test_question5() {
     let expect = "tests/expects/question5";
     run_test(judgement, expect);
 }
+
+#[test]
+fn test_question6() {
+    let judgement = "S(S(Z)) times Z is Z";
+    let expect = "tests/expects/question6";
+    run_test(judgement, expect);
+}
+
+#[test]
+fn test_question7() {
+    let judgement = "S(S(Z)) times S(Z) is S(S(Z))";
+    let expect = "tests/expects/question7";
+    run_test(judgement, expect);
+}

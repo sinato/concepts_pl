@@ -12,5 +12,5 @@ pub fn derive<W: Write>(judgement: &str, w: &mut W) -> io::Result<()> {
     // dbg!(&tokens);
     let node = RuleNode::new(&mut tokens);
     // dbg!(&node);
-    node.show(w, 0)
+    node.show(w, 0, true)
 }
