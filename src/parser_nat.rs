@@ -1,4 +1,5 @@
 use crate::lexer::Tokens;
+use crate::util::*;
 use std::io::{self, Write};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -141,25 +142,4 @@ impl TSuccNode {
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
     }
-}
-
-fn get_peano_num(nat_num: usize) -> String {
-    let mut s = "".to_string();
-
-    for _ in 0..nat_num {
-        s += "S(";
-    }
-    s += "Z";
-    for _ in 0..nat_num {
-        s += ")";
-    }
-    s
-}
-
-fn get_depth_space(depth: usize) -> String {
-    let mut s = "".to_string();
-    for _ in 0..depth {
-        s += " ";
-    }
-    s
 }

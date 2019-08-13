@@ -1,11 +1,11 @@
 extern crate concepts_pl;
 
-use concepts_pl::derive;
+use concepts_pl::{derive, DerivationRules};
 
 use std::io;
 
 fn main() {
-    let judgement = "S(S(Z)) times S(S(Z)) is S(S(S(S(Z))))";
+    let judgement = "S(S(Z)) is less than S(S(S(Z)))";
 
     println!("judgement ========================");
     println!("{}", judgement);
@@ -13,6 +13,6 @@ fn main() {
     println!("derivation tree ==================");
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    let _ = derive(judgement, &mut stdout);
+    let _ = derive(judgement, DerivationRules::CompNat1, &mut stdout);
     println!("==================================");
 }

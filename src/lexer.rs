@@ -16,11 +16,12 @@ pub enum Token {
     Ps(DebugInfo),
     Pe(DebugInfo),
     Op(String, DebugInfo),
+    Lt(DebugInfo),
 }
 impl Token {
     pub fn get_debug_info(self, filename: &str) -> String {
         let debug_info = match self.clone() {
-            Token::Zero(d) | Token::Equal(d) | Token::Pe(d) | Token::Ps(d) => d,
+            Token::Lt(d) | Token::Zero(d) | Token::Equal(d) | Token::Pe(d) | Token::Ps(d) => d,
             Token::Op(_, d) => d,
         };
         let mut file = File::open(filename).unwrap();
@@ -92,6 +93,7 @@ impl Lexer {
         let token_patterns = vec![
             ("ZERO", r"Z"),
             ("OP", r"(plus)|(times)"),
+            ("LT", r"is less than"),
             ("EQ", r"is"),
             ("PS", r"S\("),
             ("PE", r"\)"),
@@ -131,6 +133,7 @@ impl Lexer {
             match typ.as_ref() {
                 "ZERO" => tokens.push(Token::Zero(debug_info)),
                 "OP" => tokens.push(Token::Op(val, debug_info)),
+                "LT" => tokens.push(Token::Lt(debug_info)),
                 "EQ" => tokens.push(Token::Equal(debug_info)),
                 "PS" => tokens.push(Token::Ps(debug_info)),
                 "PE" => tokens.push(Token::Pe(debug_info)),
