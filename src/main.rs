@@ -6,13 +6,12 @@ use std::io;
 
 fn main() {
     let judgement = "S(S(Z)) is less than S(S(S(Z)))";
-
     println!("judgement ========================");
     println!("{}", judgement);
 
     println!("derivation tree ==================");
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    let _ = derive(judgement, DerivationRules::CompNat1, &mut stdout);
+    let _ = derive(judgement, DerivationRules::CompNat3, &mut stdout);
     println!("==================================");
 }
