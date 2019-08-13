@@ -12,6 +12,6 @@ fn main() {
     println!("derivation tree ==================");
     let stdout = io::stdout();
     let mut stdout = stdout.lock();
-    let _ = derive(judgement, DerivationRules::CompNat2, &mut stdout);
+    let _ = derive(judgement, DerivationRules::CompNat3, &mut stdout);
     println!("==================================");
 }
