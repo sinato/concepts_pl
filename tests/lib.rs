@@ -98,3 +98,10 @@ fn test_question012() {
     let expect = "tests/expects/question012";
     run_test(judgement, DerivationRules::CompNat1, expect);
 }
+
+#[test]
+fn test_question013() {
+    let judgement = "S(S(Z)) is less than S(S(S(S(S(Z)))))";
+    let expect = "tests/expects/question013";
+    run_test(judgement, DerivationRules::CompNat2, expect);
+}

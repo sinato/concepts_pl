@@ -25,7 +25,7 @@ impl RuleNode {
 
 fn get_rule_lt(n1: usize, n2: usize) -> RuleNode {
     if n1 == 0 {
-        RuleNode::LZero(LZeroNode { n: n1 })
+        RuleNode::LZero(LZeroNode { n: n2 })
     } else {
         let premise = Box::new(get_rule_lt(n1 - 1, n2 - 1));
         RuleNode::LSuccSucc(LSuccSuccNode { n1, n2, premise })
@@ -38,15 +38,13 @@ pub struct LZeroNode {
 }
 impl LZeroNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let n1 = get_peano_num(self.n);
-        let n2 = get_peano_num(self.n + 1);
+        let n = get_peano_num(self.n);
         let nl = if with_newline { "\n" } else { "" };
         write!(
             w,
-            "{}{} is less than {} by L-Zero {{}}{}",
+            "{}Z is less than {} by L-Zero {{}}{}",
             get_depth_space(depth),
-            n1,
-            n2,
+            n,
             nl
         )
     }
