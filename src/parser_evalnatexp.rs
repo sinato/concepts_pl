@@ -166,13 +166,14 @@ impl Terms {
                     }
                 }
                 Term::Node(operator, terms) => {
-                    s += "(";
                     match operator.as_ref() {
-                        "" => s += &terms.to_string(),
-                        "+" => s = s + " + " + &terms.to_string(),
-                        "*" => s = s + " * " + &terms.to_string(),
+                        "" => (),
+                        "+" => s = s + " + ",
+                        "*" => s = s + " * ",
                         _ => panic!("TODO"),
                     }
+                    s += "(";
+                    s += &terms.to_string();
                     s += ")";
                 }
             }
