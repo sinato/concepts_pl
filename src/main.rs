@@ -5,7 +5,7 @@ use concepts_pl::{derive, DerivationRules};
 use std::io;
 
 fn main() {
-    let judgement = "S(S(S(Z))) + S(S(Z)) * S(Z) evalto S(S(S(S(S(Z)))))";
+    let judgement = "(S(S(Z)) + S(S(Z))) * Z evalto Z";
     println!("judgement ========================");
     println!("{}", judgement);
 

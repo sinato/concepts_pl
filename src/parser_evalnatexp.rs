@@ -17,24 +17,7 @@ pub enum RuleNode {
 
 impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
-        let mut terms: Terms = Terms::new();
-        let num = tokens.consume_peano_num();
-        terms.push(("".to_string(), num));
-        loop {
-            match tokens.peek().expect("expects a tokens") {
-                Token::OpC(operator, _) => {
-                    tokens.pop(); // consume operator
-                    let num = tokens.consume_peano_num();
-                    terms.push((operator, num));
-                }
-                Token::Eval(_) => {
-                    tokens.pop(); // consume evalto
-                    let _res = tokens.consume_peano_num(); // consume ans num
-                    break;
-                }
-                _ => panic!("unexpected token: {:?}"),
-            }
-        }
+        let terms = Terms::new(tokens);
         get_rule_eval(terms)
     }
     pub fn get_val(&self) -> usize {
@@ -62,18 +45,70 @@ impl RuleNode {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+enum Term {
+    Leaf(String, usize),
+    Node(String, Terms),
+}
+impl Term {
+    fn new(tokens: &mut Tokens, operator: String) -> Term {
+        match tokens.peek().expect("") {
+            Token::ParenS(_) => {
+                tokens.pop(); // consume (
+                let terms = Terms::new(tokens);
+                tokens.pop(); // consume )
+                Term::Node(operator, terms)
+            }
+            Token::Ps(_) => {
+                let num = tokens.consume_peano_num();
+                Term::Leaf(operator, num)
+            }
+            Token::Zero(_) => {
+                tokens.pop(); // consume Z
+                Term::Leaf(operator, 0)
+            }
+            _ => panic!("unexpect"),
+        }
+    }
+    fn get_operator(&self) -> String {
+        match self {
+            Term::Leaf(op, _) => op.to_string(),
+            Term::Node(op, _) => op.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 struct Terms {
-    terms: Vec<(String, usize)>,
+    terms: Vec<Term>,
 }
 impl Terms {
-    fn new() -> Terms {
-        let terms: Vec<(String, usize)> = Vec::new();
-        Terms { terms }
+    fn new(tokens: &mut Tokens) -> Terms {
+        let terms: Vec<Term> = Vec::new();
+        let mut terms = Terms { terms };
+        terms.push(Term::new(tokens, "".to_string()));
+        loop {
+            match tokens.peek().expect("expects a tokens") {
+                Token::OpC(operator, _) => {
+                    tokens.pop(); // consume operator
+                    terms.push(Term::new(tokens, operator));
+                }
+                Token::Eval(_) => {
+                    tokens.pop(); // consume evalto
+                    let _res = tokens.consume_peano_num(); // consume ans num. expect a number ( not an expression )
+                    break;
+                }
+                Token::Pe(_) => {
+                    break;
+                }
+                _ => panic!("unexpected token: {:?}"),
+            }
+        }
+        terms
     }
-    fn push(&mut self, term: (String, usize)) {
+    fn push(&mut self, term: Term) {
         self.terms.push(term)
     }
-    fn pop(&mut self) -> Option<(String, usize)> {
+    fn pop(&mut self) -> Option<Term> {
         self.terms.pop()
     }
     fn len(&mut self) -> usize {
@@ -89,7 +124,8 @@ impl Terms {
         let mut priority: usize = 0;
         let mut ret_op: String = "".to_string();
         let terms = self.terms.clone();
-        for (i, (operator, _)) in terms.into_iter().enumerate() {
+        for (i, term) in terms.into_iter().enumerate() {
+            let operator = term.get_operator();
             if priority <= *priorities.get(&operator).expect("") {
                 split_position = i;
                 priority = *priorities.get(&operator).expect("");
@@ -99,8 +135,8 @@ impl Terms {
         (split_position, ret_op.to_string())
     }
     fn get_splitted_terms(&self, split_position: usize) -> (Terms, Terms) {
-        let mut former: Vec<(String, usize)> = Vec::new();
-        let mut latter: Vec<(String, usize)> = Vec::new();
+        let mut former: Vec<Term> = Vec::new();
+        let mut latter: Vec<Term> = Vec::new();
 
         let terms = self.terms.clone();
         for (i, term) in terms.into_iter().enumerate() {
@@ -118,25 +154,42 @@ impl Terms {
     fn to_string(self) -> String {
         let mut s = "".to_string();
         let terms = self.terms.into_iter();
-        for (operator, num) in terms {
-            let snum = &get_peano_num(num);
-            match operator.as_ref() {
-                "" => s += snum,
-                "+" => s = s + " + " + snum,
-                "*" => s = s + " * " + snum,
-                _ => panic!("TODO"),
+        for term in terms {
+            match term {
+                Term::Leaf(operator, num) => {
+                    let snum = &get_peano_num(num);
+                    match operator.as_ref() {
+                        "" => s += snum,
+                        "+" => s = s + " + " + snum,
+                        "*" => s = s + " * " + snum,
+                        _ => panic!("TODO"),
+                    }
+                }
+                Term::Node(operator, terms) => {
+                    s += "(";
+                    match operator.as_ref() {
+                        "" => s += &terms.to_string(),
+                        "+" => s = s + " + " + &terms.to_string(),
+                        "*" => s = s + " * " + &terms.to_string(),
+                        _ => panic!("TODO"),
+                    }
+                    s += ")";
+                }
             }
         }
         s
     }
     fn rm_first_operator(&mut self) {
-        let mut new_terms: Vec<(String, usize)> = Vec::new();
+        let mut new_terms: Vec<Term> = Vec::new();
         let terms = self.terms.clone().into_iter();
-        for (i, (operator, num)) in terms.enumerate() {
+        for (i, term) in terms.enumerate() {
             if i == 0 {
-                new_terms.push((String::from(""), num));
+                match term {
+                    Term::Leaf(_, num) => new_terms.push(Term::Leaf(String::from(""), num)),
+                    Term::Node(_, v) => new_terms.push(Term::Node(String::from(""), v)),
+                }
             } else {
-                new_terms.push((operator, num));
+                new_terms.push(term);
             }
         }
         self.terms = new_terms;
@@ -146,8 +199,11 @@ impl Terms {
 fn get_rule_eval(mut terms: Terms) -> RuleNode {
     let terms_clone = terms.clone();
     if terms.len() == 1 {
-        let (_, num) = terms.pop().expect("");
-        RuleNode::EConst(EConstNode { n: num })
+        let term = terms.pop().expect("");
+        match term {
+            Term::Leaf(_, num) => RuleNode::EConst(EConstNode { n: num }),
+            Term::Node(_, terms) => get_rule_eval(terms),
+        }
     } else {
         let (split_position, split_operator) = terms.get_split_position();
         let (former, latter) = terms.get_splitted_terms(split_position);
@@ -359,95 +415,5 @@ impl TSuccNode {
     }
     fn get_val(&self) -> usize {
         self.n1 * self.n2
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn get_terms1() -> Terms {
-        let mut terms: Vec<(String, usize)> = Vec::new();
-        terms.push(("".to_string(), 3));
-        terms.push(("+".to_string(), 2));
-        terms.push(("*".to_string(), 1));
-        Terms { terms }
-    }
-
-    fn get_terms2() -> Terms {
-        let mut terms: Vec<(String, usize)> = Vec::new();
-        terms.push(("".to_string(), 3));
-        terms.push(("+".to_string(), 2));
-        Terms { terms }
-    }
-
-    #[test]
-    fn test_get_split_position1() {
-        let terms = get_terms1();
-        let (position, operator) = terms.get_split_position();
-        assert_eq!(position, 1);
-        assert_eq!(operator, "+".to_string());
-    }
-
-    #[test]
-    fn test_get_split_position2() {
-        let terms = get_terms2();
-        let (position, operator) = terms.get_split_position();
-        assert_eq!(position, 1);
-        assert_eq!(operator, "+".to_string());
-    }
-
-    #[test]
-    fn test_get_splitted_terms1() {
-        let terms = get_terms1();
-        let (former, latter) = terms.get_splitted_terms(1);
-
-        let mut terms: Vec<(String, usize)> = Vec::new();
-        terms.push(("".to_string(), 3));
-        let expect_former = Terms { terms };
-
-        let mut terms: Vec<(String, usize)> = Vec::new();
-        terms.push(("".to_string(), 2));
-        terms.push(("*".to_string(), 1));
-        let expect_latter = Terms { terms };
-
-        assert_eq!(expect_former, former);
-        assert_eq!(expect_latter, latter);
-    }
-
-    #[test]
-    fn test_get_splitted_terms2() {
-        let terms = get_terms2();
-        let (former, latter) = terms.get_splitted_terms(1);
-
-        let mut terms: Vec<(String, usize)> = Vec::new();
-        terms.push(("".to_string(), 3));
-        let expect_former = Terms { terms };
-
-        let mut terms: Vec<(String, usize)> = Vec::new();
-        terms.push(("".to_string(), 2));
-        let expect_latter = Terms { terms };
-
-        assert_eq!(expect_former, former);
-        assert_eq!(expect_latter, latter);
-    }
-
-    #[test]
-    fn test_rm_first_operator() {
-        let mut terms: Vec<(String, usize)> = Vec::new();
-        terms.push(("*".to_string(), 3));
-        terms.push(("+".to_string(), 2));
-        let mut terms = Terms { terms };
-
-        terms.rm_first_operator();
-
-        let mut expect_terms: Vec<(String, usize)> = Vec::new();
-        expect_terms.push(("".to_string(), 3));
-        expect_terms.push(("+".to_string(), 2));
-        let expect_terms = Terms {
-            terms: expect_terms,
-        };
-
-        assert_eq!(expect_terms, terms);
     }
 }

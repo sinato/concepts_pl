@@ -13,6 +13,7 @@ pub struct DebugInfo {
 pub enum Token {
     Zero(DebugInfo),
     Equal(DebugInfo),
+    ParenS(DebugInfo),
     Ps(DebugInfo),
     Pe(DebugInfo),
     Op(String, DebugInfo),
@@ -27,6 +28,7 @@ impl Token {
             | Token::Eval(d)
             | Token::Zero(d)
             | Token::Equal(d)
+            | Token::ParenS(d)
             | Token::Pe(d)
             | Token::Ps(d) => d,
             Token::Op(_, d) | Token::OpC(_, d) => d,
@@ -104,6 +106,7 @@ impl Lexer {
             ("LT", r"is less than"),
             ("EQ", r"is"),
             ("PS", r"S\("),
+            ("PARENS", r"\("),
             ("PE", r"\)"),
             ("EVAL", r"evalto"),
         ];
@@ -145,6 +148,7 @@ impl Lexer {
                 "OPC" => tokens.push(Token::OpC(val, debug_info)),
                 "LT" => tokens.push(Token::Lt(debug_info)),
                 "EQ" => tokens.push(Token::Equal(debug_info)),
+                "PARENS" => tokens.push(Token::ParenS(debug_info)),
                 "PS" => tokens.push(Token::Ps(debug_info)),
                 "PE" => tokens.push(Token::Pe(debug_info)),
                 "EVAL" => tokens.push(Token::Eval(debug_info)),
