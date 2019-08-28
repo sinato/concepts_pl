@@ -20,12 +20,14 @@ pub enum Token {
     OpC(String, DebugInfo),
     Lt(DebugInfo),
     Eval(DebugInfo),
+    EvalMR(DebugInfo),
 }
 impl Token {
     pub fn get_debug_info(self, filename: &str) -> String {
         let debug_info = match self.clone() {
             Token::Lt(d)
             | Token::Eval(d)
+            | Token::EvalMR(d)
             | Token::Zero(d)
             | Token::Equal(d)
             | Token::ParenS(d)
@@ -74,6 +76,11 @@ impl Tokens {
                     cnt += 1;
                 }
                 Token::Pe(_) => now_cnt -= 1,
+                Token::Zero(_) => {
+                    if cnt == 0 {
+                        break;
+                    }
+                }
                 _ => (),
             }
             if now_cnt == 0 {
@@ -109,6 +116,7 @@ impl Lexer {
             ("PARENS", r"\("),
             ("PE", r"\)"),
             ("EVAL", r"evalto"),
+            ("EVALMR", r"-\*->"),
         ];
         let re = make_regex(&token_patterns);
         let names = get_names(&token_patterns);
@@ -152,6 +160,7 @@ impl Lexer {
                 "PS" => tokens.push(Token::Ps(debug_info)),
                 "PE" => tokens.push(Token::Pe(debug_info)),
                 "EVAL" => tokens.push(Token::Eval(debug_info)),
+                "EVALMR" => tokens.push(Token::EvalMR(debug_info)),
                 _ => panic!("unexpected type token"),
             }
         }
