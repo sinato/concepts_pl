@@ -175,3 +175,11 @@ fn test_question023() {
     let expect = "tests/expects/question023";
     run_test(judgement, DerivationRules::ReduceNatExp, expect);
 }
+
+#[ignore]
+#[test]
+fn test_question024() {
+    let judgement = "S(Z) * S(Z) + S(Z) * S(Z) -*-> S(S(Z))";
+    let expect = "tests/expects/question024";
+    run_test(judgement, DerivationRules::ReduceNatExp, expect);
+}
