@@ -21,6 +21,7 @@ pub enum Token {
     Lt(DebugInfo),
     Eval(DebugInfo),
     EvalMR(DebugInfo),
+    EvalDR(DebugInfo),
 }
 impl Token {
     pub fn get_debug_info(self, filename: &str) -> String {
@@ -28,6 +29,7 @@ impl Token {
             Token::Lt(d)
             | Token::Eval(d)
             | Token::EvalMR(d)
+            | Token::EvalDR(d)
             | Token::Zero(d)
             | Token::Equal(d)
             | Token::ParenS(d)
@@ -117,6 +119,7 @@ impl Lexer {
             ("PE", r"\)"),
             ("EVAL", r"evalto"),
             ("EVALMR", r"-\*->"),
+            ("EVALDR", r"-d->"),
         ];
         let re = make_regex(&token_patterns);
         let names = get_names(&token_patterns);
@@ -161,6 +164,7 @@ impl Lexer {
                 "PE" => tokens.push(Token::Pe(debug_info)),
                 "EVAL" => tokens.push(Token::Eval(debug_info)),
                 "EVALMR" => tokens.push(Token::EvalMR(debug_info)),
+                "EVALDR" => tokens.push(Token::EvalDR(debug_info)),
                 _ => panic!("unexpected type token"),
             }
         }

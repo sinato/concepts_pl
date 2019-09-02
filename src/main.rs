@@ -5,7 +5,7 @@ use concepts_pl::{derive, DerivationRules};
 use std::io;
 
 fn main() {
-    let judgement = "Z + S(S(Z)) -*-> S(S(Z))";
+    let judgement = "S(Z) * S(Z) + S(Z) * S(Z) -d-> S(Z) + S(Z) * S(Z)";
     println!("judgement ========================");
     println!("{}", judgement);
 
