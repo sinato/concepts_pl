@@ -10,6 +10,8 @@ pub enum RuleNode {
     DRTimes(DRTimesNode),
     DRPlusL(DRPlusLNode),
     RPlus(RPlusNode),
+    RPlusR(RPlusRNode),
+    RTimes(RTimesNode),
     PZero(PZeroNode),
     PSucc(PSuccNode),
     TZero(TZeroNode),
@@ -22,6 +24,7 @@ impl RuleNode {
         let eval_op = match tokens.pop().expect("eval operator") {
             Token::EvalMR(_) => "-*->".to_string(),
             Token::EvalDR(_) => "-d->".to_string(),
+            Token::EvalONE(_) => "--->".to_string(),
             _ => panic!("TODO"),
         };
         let after_terms = Terms::new(tokens);
@@ -35,6 +38,10 @@ impl RuleNode {
                 before_terms,
                 after_terms,
             }),
+            "--->" => RuleNode::RPlusR(RPlusRNode {
+                before_terms,
+                after_terms,
+            }),
             _ => panic!("TODO"),
         }
     }
@@ -44,6 +51,8 @@ impl RuleNode {
             RuleNode::DRTimes(node) => node.show(w, depth, with_newline),
             RuleNode::DRPlusL(node) => node.show(w, depth, with_newline),
             RuleNode::RPlus(node) => node.show(w, depth, with_newline),
+            RuleNode::RPlusR(node) => node.show(w, depth, with_newline),
+            RuleNode::RTimes(node) => node.show(w, depth, with_newline),
             RuleNode::PZero(node) => node.show(w, depth, with_newline),
             RuleNode::PSucc(node) => node.show(w, depth, with_newline),
             RuleNode::TZero(node) => node.show(w, depth, with_newline),
@@ -62,6 +71,14 @@ fn get_drtimes(terms: &mut Terms) -> RuleNode {
     let (_, n1) = terms.pop().expect("");
     let (_, n2) = terms.pop().expect("");
     RuleNode::DRTimes(DRTimesNode { n1, n2 })
+}
+
+fn get_rtimes_r(terms: &mut Terms) -> RuleNode {
+    terms.reverse();
+    let (_, n1) = terms.pop().expect("");
+    let (_, n2) = terms.pop().expect("");
+    terms.reverse();
+    RuleNode::RTimes(RTimesNode { n1, n2 })
 }
 
 fn get_rule_plus(n1: usize, n2: usize) -> RuleNode {
@@ -126,6 +143,7 @@ impl DRPlusLNode {
         write!(w, "{}}}{}", get_depth_space(depth), nl)
     }
 }
+
 #[derive(Debug, Clone)]
 pub struct MROneNode {
     before_terms: Terms,
@@ -166,6 +184,53 @@ impl RPlusNode {
         );
 
         let premise = get_rule_plus(self.n1, self.n2);
+        let _ = premise.show(w, depth + 2, true);
+
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RPlusRNode {
+    before_terms: Terms,
+    after_terms: Terms,
+}
+impl RPlusRNode {
+    fn show<W: Write>(mut self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} ---> {} by R-PlusR {{\n",
+            get_depth_space(depth),
+            self.before_terms.clone().to_string(),
+            self.after_terms.to_string(),
+        );
+
+        let premise = get_rtimes_r(&mut self.before_terms);
+        let _ = premise.show(w, depth + 2, true);
+
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RTimesNode {
+    n1: usize,
+    n2: usize,
+}
+impl RTimesNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} * {} ---> {} by R-Times {{\n",
+            get_depth_space(depth),
+            get_peano_num(self.n1),
+            get_peano_num(self.n2),
+            get_peano_num(self.n1 * self.n2),
+        );
+
+        let premise = get_rule_times(self.n1, self.n2);
         let _ = premise.show(w, depth + 2, true);
 
         let nl = if with_newline { "\n" } else { "" };
@@ -264,6 +329,7 @@ impl Terms {
                     }
                     Token::EvalMR(_) => break,
                     Token::EvalDR(_) => break,
+                    Token::EvalONE(_) => break,
                     _ => panic!("unexpected token: {:?}"),
                 },
                 None => break,
@@ -276,6 +342,9 @@ impl Terms {
         let term = self.terms.pop();
         self.terms.reverse();
         term
+    }
+    fn reverse(&mut self) {
+        self.terms.reverse();
     }
     fn to_string(self) -> String {
         let mut s = "".to_string();
