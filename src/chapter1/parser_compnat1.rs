@@ -1,11 +1,11 @@
-use crate::lexer::Tokens;
-use crate::util::*;
+use super::lexer::Tokens;
+use super::util::{get_depth_space, get_peano_num};
 use std::io::{self, Write};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum RuleNode {
-    LZero(LZeroNode),
-    LSuccSucc(LSuccSuccNode),
+    LSucc(LSuccNode),
+    LTrans(LTransNode),
 }
 impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
@@ -17,57 +17,70 @@ impl RuleNode {
 
     pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         match self {
-            RuleNode::LZero(node) => node.show(w, depth, with_newline),
-            RuleNode::LSuccSucc(node) => node.show(w, depth, with_newline),
+            RuleNode::LSucc(node) => node.show(w, depth, with_newline),
+            RuleNode::LTrans(node) => node.show(w, depth, with_newline),
         }
     }
 }
 
 fn get_rule_lt(n1: usize, n2: usize) -> RuleNode {
-    if n1 == 0 {
-        RuleNode::LZero(LZeroNode { n: n2 })
+    if n1 + 1 == n2 {
+        RuleNode::LSucc(LSuccNode { n: n1 })
+    } else if n1 + 1 < n2 {
+        let premise1 = Box::new(get_rule_lt(n1, n2 - 1));
+        let premise2 = Box::new(get_rule_lt(n2 - 1, n2));
+        RuleNode::LTrans(LTransNode {
+            n1,
+            n2,
+            premise1,
+            premise2,
+        })
     } else {
-        let premise = Box::new(get_rule_lt(n1 - 1, n2 - 1));
-        RuleNode::LSuccSucc(LSuccSuccNode { n1, n2, premise })
+        panic!("unexpected number")
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LZeroNode {
+pub struct LSuccNode {
     n: usize,
 }
-impl LZeroNode {
+impl LSuccNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let n = get_peano_num(self.n);
+        let n1 = get_peano_num(self.n);
+        let n2 = get_peano_num(self.n + 1);
         let nl = if with_newline { "\n" } else { "" };
         write!(
             w,
-            "{}Z is less than {} by L-Zero {{}}{}",
+            "{}{} is less than {} by L-Succ {{}}{}",
             get_depth_space(depth),
-            n,
+            n1,
+            n2,
             nl
         )
     }
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct LSuccSuccNode {
+pub struct LTransNode {
     n1: usize,
     n2: usize,
-    premise: Box<RuleNode>,
+    premise1: Box<RuleNode>,
+    premise2: Box<RuleNode>,
 }
-impl LSuccSuccNode {
+impl LTransNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         let n1 = get_peano_num(self.n1);
         let n2 = get_peano_num(self.n2);
         let _ = write!(
             w,
-            "{}{} is less than {} by L-SuccSucc {{\n",
+            "{}{} is less than {} by L-Trans {{\n",
             get_depth_space(depth),
             n1,
-            n2
+            n2,
         );
-        let _ = self.premise.show(w, depth + 2, true);
+        let _ = self.premise1.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+        let _ = self.premise2.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
     }

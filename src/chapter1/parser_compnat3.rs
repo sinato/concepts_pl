@@ -1,5 +1,5 @@
-use crate::lexer::Tokens;
-use crate::util::*;
+use super::lexer::Tokens;
+use super::util::*;
 use std::io::{self, Write};
 
 #[derive(Debug, PartialEq, Clone)]

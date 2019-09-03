@@ -1,6 +1,7 @@
 extern crate concepts_pl;
 
-use concepts_pl::{derive, DerivationRules};
+use concepts_pl::chapter1::{derive, DerivationRules};
+use concepts_pl::parser_evalml1::derive as evalml1_derive;
 
 use std::{fs, str};
 
@@ -10,6 +11,17 @@ fn run_test(judgement: &str, derivation_rules: DerivationRules, expect_filepath:
 
     let mut buf = Vec::<u8>::new();
     let _ = derive(judgement, derivation_rules, &mut buf);
+    let actual = str::from_utf8(&buf).expect("expects result str");
+    println!("{:?}", actual);
+    assert_eq!(actual, expect);
+}
+
+fn run_test2(judgement: &str, expect_filepath: &str) {
+    let expect: String =
+        fs::read_to_string(expect_filepath).expect("something went wrong reading the file.");
+
+    let mut buf = Vec::<u8>::new();
+    let _ = evalml1_derive(judgement, &mut buf);
     let actual = str::from_utf8(&buf).expect("expects result str");
     println!("{:?}", actual);
     assert_eq!(actual, expect);
@@ -182,4 +194,11 @@ fn test_question024() {
     let judgement = "S(Z) * S(Z) + S(Z) * S(Z) -*-> S(S(Z))";
     let expect = "tests/expects/question024";
     run_test(judgement, DerivationRules::ReduceNatExp, expect);
+}
+
+#[test]
+fn test_question025() {
+    let judgement = "3 + 5 evalto 8";
+    let expect = "tests/expects/question025";
+    run_test2(judgement, expect);
 }

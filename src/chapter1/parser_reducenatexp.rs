@@ -1,5 +1,5 @@
-use crate::lexer::{Token, Tokens};
-use crate::util::{get_depth_space, get_peano_num};
+use super::lexer::{Token, Tokens};
+use super::util::{get_depth_space, get_peano_num};
 
 use std::collections::HashMap;
 use std::io::{self, Write};
