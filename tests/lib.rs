@@ -202,3 +202,10 @@ fn test_question025() {
     let expect = "tests/expects/question025";
     run_test2(judgement, expect);
 }
+
+#[test]
+fn test_question026() {
+    let judgement = "8 - 2 - 3 evalto 3";
+    let expect = "tests/expects/question026";
+    run_test2(judgement, expect);
+}

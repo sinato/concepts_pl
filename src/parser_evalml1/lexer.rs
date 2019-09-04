@@ -30,6 +30,20 @@ impl Tokens {
     pub fn reverse(&mut self) {
         self.tokens.reverse()
     }
+    pub fn consume_num(&mut self) -> i32 {
+        let token = self.pop().expect("");
+        match token {
+            Token::Int(val) => val.parse().expect(""),
+            _ => panic!(""),
+        }
+    }
+    pub fn consume_op(&mut self) -> String {
+        let token = self.pop().expect("");
+        match token {
+            Token::Op(op) => op,
+            _ => panic!(""),
+        }
+    }
 }
 
 pub struct Lexer {
@@ -40,7 +54,7 @@ pub struct Lexer {
 impl Lexer {
     // static constructor
     pub fn new() -> Lexer {
-        let token_patterns = vec![("INT", r"[0-9]"), ("OP", r"\+"), ("EVAL", r"evalto")];
+        let token_patterns = vec![("INT", r"[0-9]"), ("OP", r"\+|-"), ("EVAL", r"evalto")];
         let re = make_regex(&token_patterns);
         let names = get_names(&token_patterns);
         let re = Regex::new(&re).expect("something went wrong making the regex");
