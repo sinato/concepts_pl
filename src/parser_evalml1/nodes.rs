@@ -1,45 +1,26 @@
-use super::lexer::{Token, Tokens};
-use super::terms::Terms;
+use super::lexer::Tokens;
+use super::terms::{Term, Terms};
 use std::io::{self, Write};
 
 #[derive(Debug, Clone)]
 pub enum RuleNode {
     EInt(EIntNode),
     EPlus(EPlusNode),
+    ETimes(ETimesNode),
     EMinus(EMinusNode),
 }
 impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
-        let mut terms: Terms = Terms::new();
-
-        let num = tokens.consume_num();
-        terms.push((String::from(""), num));
-        loop {
-            match tokens.peek() {
-                Some(token) => match token {
-                    Token::Int(_) => panic!("unexpected num token"),
-                    Token::Op(_) => {
-                        let op = tokens.consume_op();
-                        let num = tokens.consume_num();
-                        terms.push((op, num));
-                    }
-                    Token::Eval(_) => {
-                        tokens.pop(); // consume evalto
-                        tokens.pop(); // consume expression result
-                        break;
-                    }
-                },
-                None => panic!("expect at least one eval token"),
-            }
-        }
-        let expression = Expression::new(&mut terms);
+        let terms: Terms = Terms::new(tokens);
+        let expression = Expression::new(terms.clone(), terms);
         match expression {
-            Expression::Int(i) => RuleNode::EInt(EIntNode { i }),
-            Expression::Bin(operator, box_ex1, box_ex2) => {
+            Expression::Int(i, _) => RuleNode::EInt(EIntNode { i }),
+            Expression::Bin(operator, box_ex1, box_ex2, _) => {
                 let e1 = *box_ex1;
                 let e2 = *box_ex2;
                 match operator.as_ref() {
                     "+" => RuleNode::EPlus(EPlusNode { e1, e2 }),
+                    "*" => RuleNode::ETimes(ETimesNode { e1, e2 }),
                     "-" => RuleNode::EMinus(EMinusNode { e1, e2 }),
                     _ => panic!("todo"),
                 }
@@ -51,6 +32,7 @@ impl RuleNode {
         match self {
             RuleNode::EInt(node) => node.show(w, depth, with_newline),
             RuleNode::EPlus(node) => node.show(w, depth, with_newline),
+            RuleNode::ETimes(node) => node.show(w, depth, with_newline),
             RuleNode::EMinus(node) => node.show(w, depth, with_newline),
         }
     }
@@ -58,30 +40,33 @@ impl RuleNode {
 
 #[derive(Debug, Clone)]
 pub enum Expression {
-    Int(i32),
-    Bin(String, Box<Expression>, Box<Expression>),
+    Int(i32, Terms),
+    Bin(String, Box<Expression>, Box<Expression>, Terms),
 }
 impl Expression {
-    fn new(terms: &mut Terms) -> Expression {
+    fn new(mut terms: Terms, origin_terms: Terms) -> Expression {
         if terms.len() == 1 {
-            let (_, num) = terms.pop().expect("");
-            Expression::Int(num)
+            let term = terms.pop().expect("");
+            match term {
+                Term::Leaf(_, num) => Expression::Int(num, origin_terms),
+                Term::Node(_, terms) => Expression::new(terms, origin_terms),
+            }
         } else {
-            let (split_position, operator) = terms.get_split_position();
-            let (mut before_terms, mut after_terms) = terms.get_splitted_terms(split_position);
+            let (split_position, split_operator) = terms.get_split_position();
+            let (former, latter) = terms.get_splitted_terms(split_position);
             println!("================================");
-            println!("before: {:?}", before_terms);
-            println!("after: {:?}", after_terms);
+            println!("before: {:?}", former);
+            println!("after: {:?}", latter);
             println!("================================");
-            let e1 = Expression::new(&mut before_terms);
-            let e2 = Expression::new(&mut after_terms);
-            Expression::Bin(operator, Box::new(e1), Box::new(e2))
+            let e1 = Expression::new(former.clone(), former);
+            let e2 = Expression::new(latter.clone(), latter);
+            Expression::Bin(split_operator, Box::new(e1), Box::new(e2), origin_terms)
         }
     }
     fn get_val(&self) -> i32 {
         match self {
-            Expression::Int(val) => *val,
-            Expression::Bin(operator, box_ex1, box_ex2) => {
+            Expression::Int(val, _) => *val,
+            Expression::Bin(operator, box_ex1, box_ex2, _) => {
                 let val1 = box_ex1.get_val();
                 let val2 = box_ex2.get_val();
                 match operator.as_ref() {
@@ -94,8 +79,8 @@ impl Expression {
     }
     fn get_rule(self) -> RuleNode {
         match self {
-            Expression::Int(i) => RuleNode::EInt(EIntNode { i }),
-            Expression::Bin(operator, box_ex1, box_ex2) => match operator.as_ref() {
+            Expression::Int(i, _) => RuleNode::EInt(EIntNode { i }),
+            Expression::Bin(operator, box_ex1, box_ex2, _) => match operator.as_ref() {
                 "+" => RuleNode::EPlus(EPlusNode {
                     e1: *box_ex1,
                     e2: *box_ex2,
@@ -109,12 +94,11 @@ impl Expression {
         }
     }
     fn to_string(self) -> String {
-        match self {
-            Expression::Int(val) => val.to_string(),
-            Expression::Bin(operator, box_ex1, box_ex2) => {
-                box_ex1.to_string() + " " + &operator + " " + &box_ex2.to_string()
-            }
-        }
+        let origin_terms = match self {
+            Expression::Int(_, terms) => terms,
+            Expression::Bin(_, _, _, terms) => terms,
+        };
+        origin_terms.to_string()
     }
 }
 
@@ -169,6 +153,38 @@ impl EPlusNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct ETimesNode {
+    e1: Expression,
+    e2: Expression,
+}
+impl ETimesNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let i1 = self.e1.get_val();
+        let i2 = self.e2.get_val();
+        let _ = write!(
+            w,
+            "{}{} * {} evalto {} by E-Times {{\n",
+            get_depth_space(depth),
+            self.e1.clone().to_string(),
+            self.e2.clone().to_string(),
+            i1 * i2
+        );
+        let premise1 = self.e1.get_rule();
+        let premise2 = self.e2.get_rule();
+        let _ = premise1.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+        let _ = premise2.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+
+        let premise = BTimesNode { i1, i2 };
+        let _ = premise.show(w, depth + 2, true);
+
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct EMinusNode {
     e1: Expression,
     e2: Expression,
@@ -214,6 +230,25 @@ impl BPlusNode {
             self.i1,
             self.i2,
             self.i1 + self.i2,
+            if with_newline { "\n" } else { "" }
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BTimesNode {
+    i1: i32,
+    i2: i32,
+}
+impl BTimesNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        write!(
+            w,
+            "{}{} times {} is {} by B-Times {{}}{}",
+            get_depth_space(depth),
+            self.i1,
+            self.i2,
+            self.i1 * self.i2,
             if with_newline { "\n" } else { "" }
         )
     }

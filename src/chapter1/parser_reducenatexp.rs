@@ -1,7 +1,6 @@
 use super::lexer::{Token, Tokens};
 use super::util::{get_depth_space, get_peano_num};
 
-use std::collections::HashMap;
 use std::io::{self, Write};
 
 #[derive(Debug, Clone)]
@@ -359,24 +358,5 @@ impl Terms {
             }
         }
         s
-    }
-    fn get_split_position(&self) -> (usize, String) {
-        let mut priorities: HashMap<String, usize> = HashMap::new();
-        priorities.insert("".to_string(), 0);
-        priorities.insert("*".to_string(), 10);
-        priorities.insert("+".to_string(), 20);
-
-        let mut split_position = 0;
-        let mut priority: usize = 0;
-        let mut ret_op: String = "".to_string();
-        let terms = self.terms.clone();
-        for (i, (operator, num)) in terms.into_iter().enumerate() {
-            if priority <= *priorities.get(&operator).expect("") {
-                split_position = i;
-                priority = *priorities.get(&operator).expect("");
-                ret_op = operator;
-            }
-        }
-        (split_position, ret_op.to_string())
     }
 }
