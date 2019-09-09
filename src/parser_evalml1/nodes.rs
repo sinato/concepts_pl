@@ -1,13 +1,15 @@
 use super::lexer::Tokens;
-use super::terms::{Term, Terms};
+use super::terms::{IfTerms, Term, Terms};
 use std::io::{self, Write};
 
 #[derive(Debug, Clone)]
 pub enum RuleNode {
     EInt(EIntNode),
+    EIfT(EIfTNode),
     EPlus(EPlusNode),
     ETimes(ETimesNode),
     EMinus(EMinusNode),
+    ELt(ELtNode),
 }
 impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
@@ -22,7 +24,19 @@ impl RuleNode {
                     "+" => RuleNode::EPlus(EPlusNode { e1, e2 }),
                     "*" => RuleNode::ETimes(ETimesNode { e1, e2 }),
                     "-" => RuleNode::EMinus(EMinusNode { e1, e2 }),
+                    "<" => RuleNode::ELt(ELtNode { e1, e2 }),
                     _ => panic!("todo"),
+                }
+            }
+            Expression::If(box_condition_exp, box_if_exp, box_else_exp, _) => {
+                if box_condition_exp.get_val() == 1 {
+                    RuleNode::EIfT(EIfTNode {
+                        condition_exp: *box_condition_exp,
+                        then_exp: *box_if_exp,
+                        else_exp: *box_else_exp,
+                    })
+                } else {
+                    panic!("todo")
                 }
             }
         }
@@ -31,9 +45,11 @@ impl RuleNode {
     pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         match self {
             RuleNode::EInt(node) => node.show(w, depth, with_newline),
+            RuleNode::EIfT(node) => node.show(w, depth, with_newline),
             RuleNode::EPlus(node) => node.show(w, depth, with_newline),
             RuleNode::ETimes(node) => node.show(w, depth, with_newline),
             RuleNode::EMinus(node) => node.show(w, depth, with_newline),
+            RuleNode::ELt(node) => node.show(w, depth, with_newline),
         }
     }
 }
@@ -42,6 +58,7 @@ impl RuleNode {
 pub enum Expression {
     Int(i32, Terms),
     Bin(String, Box<Expression>, Box<Expression>, Terms),
+    If(Box<Expression>, Box<Expression>, Box<Expression>, Terms),
 }
 impl Expression {
     fn new(mut terms: Terms, origin_terms: Terms) -> Expression {
@@ -50,6 +67,7 @@ impl Expression {
             match term {
                 Term::Leaf(_, num) => Expression::Int(num, origin_terms),
                 Term::Node(_, terms) => Expression::new(terms, origin_terms),
+                Term::If(_, if_terms) => Expression::create_if(if_terms, origin_terms),
             }
         } else {
             let (split_position, split_operator) = terms.get_split_position();
@@ -63,6 +81,16 @@ impl Expression {
             Expression::Bin(split_operator, Box::new(e1), Box::new(e2), origin_terms)
         }
     }
+
+    fn create_if(if_terms: IfTerms, origin_terms: Terms) -> Expression {
+        let condition_exp = Box::new(Expression::new(
+            if_terms.condition_terms,
+            origin_terms.clone(),
+        ));
+        let if_exp = Box::new(Expression::new(if_terms.then_terms, origin_terms.clone()));
+        let else_exp = Box::new(Expression::new(if_terms.else_terms, origin_terms.clone()));
+        Expression::If(condition_exp, if_exp, else_exp, origin_terms)
+    }
     fn get_val(&self) -> i32 {
         match self {
             Expression::Int(val, _) => *val,
@@ -72,7 +100,21 @@ impl Expression {
                 match operator.as_ref() {
                     "+" => val1 + val2,
                     "-" => val1 - val2,
+                    "<" => {
+                        if val1 < val2 {
+                            1
+                        } else {
+                            0
+                        }
+                    }
                     _ => panic!("TODO"),
+                }
+            }
+            Expression::If(box_condition_exp, box_if_exp, box_else_exp, _) => {
+                if box_condition_exp.get_val() == 1 {
+                    box_if_exp.get_val()
+                } else {
+                    box_else_exp.get_val()
                 }
             }
         }
@@ -89,14 +131,20 @@ impl Expression {
                     e1: *box_ex1,
                     e2: *box_ex2,
                 }),
-                _ => panic!(""),
+                "<" => RuleNode::ELt(ELtNode {
+                    e1: *box_ex1,
+                    e2: *box_ex2,
+                }),
+                _ => panic!("todo"),
             },
+            Expression::If(_box_condition_exp, _box_if_exp, _box_else_exp, _) => panic!("todo"),
         }
     }
     fn to_string(self) -> String {
         let origin_terms = match self {
             Expression::Int(_, terms) => terms,
             Expression::Bin(_, _, _, terms) => terms,
+            Expression::If(_, _, _, terms) => terms,
         };
         origin_terms.to_string()
     }
@@ -117,6 +165,49 @@ impl EIntNode {
             self.i,
             nl
         )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EBoolNode {
+    b: bool,
+}
+impl EBoolNode {
+    fn _show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let nl = if with_newline { "\n" } else { "" };
+        write!(
+            w,
+            "{}{} evalto {} by E-Bool {{}}{}",
+            get_depth_space(depth),
+            self.b,
+            self.b,
+            nl
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EIfTNode {
+    condition_exp: Expression,
+    then_exp: Expression,
+    else_exp: Expression,
+}
+impl EIfTNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} evalto {} by E-IfT {{\n",
+            get_depth_space(depth),
+            self.condition_exp.clone().to_string(),
+            self.then_exp.get_val()
+        );
+        let condition_premise = self.condition_exp.get_rule();
+        let then_premise = self.then_exp.get_rule();
+        let _ = condition_premise.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+        let _ = then_premise.show(w, depth + 2, true);
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
     }
 }
 
@@ -177,6 +268,39 @@ impl ETimesNode {
         let _ = write!(w, ";\n");
 
         let premise = BTimesNode { i1, i2 };
+        let _ = premise.show(w, depth + 2, true);
+
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ELtNode {
+    e1: Expression,
+    e2: Expression,
+}
+impl ELtNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let i1 = self.e1.get_val();
+        let i2 = self.e2.get_val();
+        let b = if i1 < i2 { "true" } else { "false" };
+        let _ = write!(
+            w,
+            "{}{} < {} evalto {} by E-Lt {{\n",
+            get_depth_space(depth),
+            self.e1.clone().to_string(),
+            self.e2.clone().to_string(),
+            b
+        );
+        let premise1 = self.e1.get_rule();
+        let premise2 = self.e2.get_rule();
+        let _ = premise1.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+        let _ = premise2.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+
+        let premise = BLtNode { i1, i2 };
         let _ = premise.show(w, depth + 2, true);
 
         let nl = if with_newline { "\n" } else { "" };
@@ -268,6 +392,26 @@ impl BMinusNode {
             self.i1,
             self.i2,
             self.i1 - self.i2,
+            if with_newline { "\n" } else { "" }
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BLtNode {
+    i1: i32,
+    i2: i32,
+}
+impl BLtNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let val = if self.i1 < self.i2 { "true" } else { "false" };
+        write!(
+            w,
+            "{}{} less than {} is {} by B-Lt {{}}{}",
+            get_depth_space(depth),
+            self.i1,
+            self.i2,
+            val,
             if with_newline { "\n" } else { "" }
         )
     }

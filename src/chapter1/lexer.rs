@@ -60,6 +60,9 @@ impl Tokens {
         self.tokens.reverse();
         token
     }
+    pub fn len(&self) -> usize {
+        self.tokens.len()
+    }
     pub fn peek(&self) -> Option<Token> {
         let mut tokens = self.clone();
         tokens.pop()

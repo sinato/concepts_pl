@@ -5,7 +5,7 @@ use concepts_pl::parser_evalml1::derive;
 use std::io;
 
 fn main() {
-    let judgement = "(4 + 5) * (1 - 10) evalto -81";
+    let judgement = "if 4 < 5 then 2 + 3 else 8 * 8 evalto 5";
     println!("judgement ========================");
     println!("{}", judgement);
 

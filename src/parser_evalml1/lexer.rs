@@ -7,6 +7,9 @@ pub enum Token {
     Eval(String),
     PS,
     PE,
+    IF,
+    THEN,
+    ELSE,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -51,9 +54,12 @@ impl Lexer {
         let token_patterns = vec![
             ("MINT", r"-[1-9][0-9]*"),
             ("INT", r"[1-9][0-9]*"),
-            ("OP", r"\+|-|\*"),
+            ("OP", r"\+|-|\*|<"),
             ("PS", r"\("),
             ("PE", r"\)"),
+            ("IF", r"if"),
+            ("THEN", r"then"),
+            ("ELSE", r"else"),
             ("EVAL", r"evalto"),
         ];
         let re = make_regex(&token_patterns);
@@ -84,6 +90,9 @@ impl Lexer {
                 "EVAL" => tokens.push(Token::Eval(val)),
                 "PS" => tokens.push(Token::PS),
                 "PE" => tokens.push(Token::PE),
+                "IF" => tokens.push(Token::IF),
+                "THEN" => tokens.push(Token::THEN),
+                "ELSE" => tokens.push(Token::ELSE),
                 _ => panic!("unexpected type token"),
             }
         }

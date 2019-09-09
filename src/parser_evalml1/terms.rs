@@ -6,7 +6,9 @@ use std::collections::HashMap;
 pub enum Term {
     Leaf(String, i32),
     Node(String, Terms),
+    If(String, IfTerms),
 }
+
 impl Term {
     fn new(tokens: &mut Tokens, operator: String) -> Term {
         match tokens.peek().expect("") {
@@ -19,6 +21,10 @@ impl Term {
                 let num = tokens.consume_num();
                 Term::Leaf(operator, num)
             }
+            Token::IF => {
+                let if_terms = IfTerms::new(tokens);
+                Term::If(operator, if_terms)
+            }
             _ => panic!("unexpect"),
         }
     }
@@ -26,6 +32,29 @@ impl Term {
         match self {
             Term::Leaf(op, _) => op.to_string(),
             Term::Node(op, _) => op.to_string(),
+            Term::If(op, _) => op.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IfTerms {
+    pub condition_terms: Terms,
+    pub then_terms: Terms,
+    pub else_terms: Terms,
+}
+impl IfTerms {
+    pub fn new(tokens: &mut Tokens) -> IfTerms {
+        tokens.pop(); // consume if
+        let condition_terms = Terms::new(tokens);
+        tokens.pop(); // consume then
+        let then_terms = Terms::new(tokens);
+        tokens.pop(); // consume else
+        let else_terms = Terms::new(tokens);
+        IfTerms {
+            condition_terms,
+            then_terms,
+            else_terms,
         }
     }
 }
@@ -48,8 +77,6 @@ impl Terms {
                         terms.push(Term::new(tokens, op));
                     }
                     Token::Eval(_) => {
-                        tokens.pop(); // consume evalto
-                        tokens.pop(); // consume expression result
                         break;
                     }
                     Token::PS => panic!("unexpect ( token"),
@@ -57,6 +84,7 @@ impl Terms {
                         tokens.pop(); // consume )
                         break;
                     }
+                    Token::IF | Token::ELSE | Token::THEN => break,
                 },
                 None => panic!("expect at least one eval token"),
             }
@@ -78,6 +106,7 @@ impl Terms {
         priorities.insert("*".to_string(), 10);
         priorities.insert("+".to_string(), 20);
         priorities.insert("-".to_string(), 20);
+        priorities.insert("<".to_string(), 30);
 
         let mut split_position = 0;
         let mut priority: usize = 0;
@@ -88,12 +117,12 @@ impl Terms {
             if priority
                 <= *priorities
                     .get(&operator)
-                    .expect("cannot get operator priority")
+                    .expect(&format!("cannot get operator priority: {}", operator))
             {
                 split_position = i;
                 priority = *priorities
                     .get(&operator)
-                    .expect("cannot get operator priority");
+                    .expect(&format!("cannot get operator priority: {}", operator));
                 ret_op = operator;
             }
         }
@@ -122,26 +151,23 @@ impl Terms {
         for term in terms {
             match term {
                 Term::Leaf(operator, num) => {
-                    let snum = &num.to_string();
-                    match operator.as_ref() {
-                        "" => s += snum,
-                        "+" => s = s + " + " + snum,
-                        "-" => s = s + " - " + snum,
-                        "*" => s = s + " * " + snum,
-                        _ => panic!("TODO"),
-                    }
+                    s = add_op(operator, s);
+                    s += &num.to_string()
                 }
                 Term::Node(operator, terms) => {
-                    match operator.as_ref() {
-                        "" => (),
-                        "+" => s = s + " + ",
-                        "-" => s = s + " - ",
-                        "*" => s = s + " * ",
-                        _ => panic!("TODO"),
-                    }
+                    s = add_op(operator, s);
                     s += "(";
                     s += &terms.to_string();
                     s += ")";
+                }
+                Term::If(operator, if_terms) => {
+                    s = add_op(operator, s);
+                    s += &format!(
+                        "if {} then {} else {}",
+                        if_terms.condition_terms.to_string(),
+                        if_terms.then_terms.to_string(),
+                        if_terms.else_terms.to_string()
+                    )
                 }
             }
         }
@@ -155,11 +181,23 @@ impl Terms {
                 match term {
                     Term::Leaf(_, num) => new_terms.push(Term::Leaf(String::from(""), num)),
                     Term::Node(_, v) => new_terms.push(Term::Node(String::from(""), v)),
+                    Term::If(_, v) => new_terms.push(Term::If(String::from(""), v)),
                 }
             } else {
                 new_terms.push(term);
             }
         }
         self.terms = new_terms;
+    }
+}
+
+fn add_op(operator: String, s: String) -> String {
+    match operator.as_ref() {
+        "" => s + "",
+        "+" => s + " + ",
+        "-" => s + " - ",
+        "*" => s + " * ",
+        "<" => s + " < ",
+        _ => panic!("TODO"),
     }
 }
