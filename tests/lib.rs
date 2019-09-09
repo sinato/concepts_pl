@@ -223,3 +223,10 @@ fn test_question028() {
     let expect = "tests/expects/question028";
     run_test2(judgement, expect);
 }
+
+#[test]
+fn test_question029() {
+    let judgement = "3 + if -23 < -2 * 8 then 8 else 2 + 4 evalto 11";
+    let expect = "tests/expects/question029";
+    run_test2(judgement, expect);
+}

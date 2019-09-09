@@ -15,31 +15,7 @@ impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
         let terms: Terms = Terms::new(tokens);
         let expression = Expression::new(terms.clone(), terms);
-        match expression {
-            Expression::Int(i, _) => RuleNode::EInt(EIntNode { i }),
-            Expression::Bin(operator, box_ex1, box_ex2, _) => {
-                let e1 = *box_ex1;
-                let e2 = *box_ex2;
-                match operator.as_ref() {
-                    "+" => RuleNode::EPlus(EPlusNode { e1, e2 }),
-                    "*" => RuleNode::ETimes(ETimesNode { e1, e2 }),
-                    "-" => RuleNode::EMinus(EMinusNode { e1, e2 }),
-                    "<" => RuleNode::ELt(ELtNode { e1, e2 }),
-                    _ => panic!("todo"),
-                }
-            }
-            Expression::If(box_condition_exp, box_if_exp, box_else_exp, _) => {
-                if box_condition_exp.get_val() == 1 {
-                    RuleNode::EIfT(EIfTNode {
-                        condition_exp: *box_condition_exp,
-                        then_exp: *box_if_exp,
-                        else_exp: *box_else_exp,
-                    })
-                } else {
-                    panic!("todo")
-                }
-            }
-        }
+        expression.get_rule()
     }
 
     pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
@@ -100,6 +76,7 @@ impl Expression {
                 match operator.as_ref() {
                     "+" => val1 + val2,
                     "-" => val1 - val2,
+                    "*" => val1 * val2,
                     "<" => {
                         if val1 < val2 {
                             1
@@ -122,22 +99,28 @@ impl Expression {
     fn get_rule(self) -> RuleNode {
         match self {
             Expression::Int(i, _) => RuleNode::EInt(EIntNode { i }),
-            Expression::Bin(operator, box_ex1, box_ex2, _) => match operator.as_ref() {
-                "+" => RuleNode::EPlus(EPlusNode {
-                    e1: *box_ex1,
-                    e2: *box_ex2,
-                }),
-                "-" => RuleNode::EMinus(EMinusNode {
-                    e1: *box_ex1,
-                    e2: *box_ex2,
-                }),
-                "<" => RuleNode::ELt(ELtNode {
-                    e1: *box_ex1,
-                    e2: *box_ex2,
-                }),
-                _ => panic!("todo"),
-            },
-            Expression::If(_box_condition_exp, _box_if_exp, _box_else_exp, _) => panic!("todo"),
+            Expression::Bin(operator, box_ex1, box_ex2, _) => {
+                let e1 = *box_ex1;
+                let e2 = *box_ex2;
+                match operator.as_ref() {
+                    "+" => RuleNode::EPlus(EPlusNode { e1, e2 }),
+                    "*" => RuleNode::ETimes(ETimesNode { e1, e2 }),
+                    "-" => RuleNode::EMinus(EMinusNode { e1, e2 }),
+                    "<" => RuleNode::ELt(ELtNode { e1, e2 }),
+                    _ => panic!("todo"),
+                }
+            }
+            Expression::If(box_condition_exp, box_if_exp, box_else_exp, _) => {
+                if box_condition_exp.get_val() == 1 {
+                    RuleNode::EIfT(EIfTNode {
+                        condition_exp: *box_condition_exp,
+                        then_exp: *box_if_exp,
+                        else_exp: *box_else_exp,
+                    })
+                } else {
+                    panic!("todo")
+                }
+            }
         }
     }
     fn to_string(self) -> String {
