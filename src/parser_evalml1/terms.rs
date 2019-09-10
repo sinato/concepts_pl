@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub enum Term {
-    Leaf(String, i32),
-    Node(String, Terms),
+    Single(String, i32),
+    Paren(String, Terms),
     If(String, IfTerms),
 }
 
@@ -14,12 +14,12 @@ impl Term {
         match tokens.peek().expect("") {
             Token::PS => {
                 tokens.pop(); // consume (
-                let terms = Terms::new(tokens);
-                Term::Node(operator, terms)
+                let terms = consume_paren_terms(tokens);
+                Term::Paren(operator, terms)
             }
             Token::Int(_) => {
                 let num = tokens.consume_num();
-                Term::Leaf(operator, num)
+                Term::Single(operator, num)
             }
             Token::IF => {
                 let if_terms = IfTerms::new(tokens);
@@ -30,11 +30,54 @@ impl Term {
     }
     fn get_operator(&self) -> String {
         match self {
-            Term::Leaf(op, _) => op.to_string(),
-            Term::Node(op, _) => op.to_string(),
+            Term::Single(op, _) => op.to_string(),
+            Term::Paren(op, _) => op.to_string(),
             Term::If(op, _) => op.to_string(),
         }
     }
+}
+
+fn consume_paren_terms(tokens: &mut Tokens) -> Terms {
+    let terms: Vec<Term> = Vec::new();
+    let mut terms = Terms { terms };
+    terms.push(Term::new(tokens, "".to_string()));
+    loop {
+        match tokens.peek() {
+            Some(token) => match token {
+                Token::Op(_) => {
+                    let op = tokens.consume_op();
+                    terms.push(Term::new(tokens, op));
+                }
+                Token::PE => {
+                    tokens.pop(); // consume )
+                    break;
+                }
+                _ => panic!(format!("unexpected token: {:?}", token)),
+            },
+            None => panic!("expect at least one eval token"),
+        }
+    }
+    terms
+}
+
+fn consume_expression_terms(tokens: &mut Tokens) -> Terms {
+    let terms: Vec<Term> = Vec::new();
+    let mut terms = Terms { terms };
+    terms.push(Term::new(tokens, "".to_string()));
+    loop {
+        match tokens.peek() {
+            Some(token) => match token {
+                Token::Op(_) => {
+                    let op = tokens.consume_op();
+                    terms.push(Term::new(tokens, op));
+                }
+                Token::IF | Token::ELSE | Token::THEN | Token::Eval(_) | Token::PE => break,
+                _ => panic!(format!("unexpected token: {:?}", tokens)),
+            },
+            None => break,
+        }
+    }
+    terms
 }
 
 #[derive(Debug, Clone)]
@@ -46,11 +89,11 @@ pub struct IfTerms {
 impl IfTerms {
     pub fn new(tokens: &mut Tokens) -> IfTerms {
         tokens.pop(); // consume if
-        let condition_terms = Terms::new(tokens);
+        let condition_terms = consume_expression_terms(tokens);
         tokens.pop(); // consume then
-        let then_terms = Terms::new(tokens);
+        let then_terms = consume_expression_terms(tokens);
         tokens.pop(); // consume else
-        let else_terms = Terms::new(tokens);
+        let else_terms = consume_expression_terms(tokens);
         IfTerms {
             condition_terms,
             then_terms,
@@ -71,22 +114,14 @@ impl Terms {
         loop {
             match tokens.peek() {
                 Some(token) => match token {
-                    Token::Int(_) => panic!("unexpected num token"),
                     Token::Op(_) => {
                         let op = tokens.consume_op();
                         terms.push(Term::new(tokens, op));
                     }
-                    Token::Eval(_) => {
-                        break;
-                    }
-                    Token::PS => panic!("unexpect ( token"),
-                    Token::PE => {
-                        tokens.pop(); // consume )
-                        break;
-                    }
-                    Token::IF | Token::ELSE | Token::THEN => break,
+                    Token::Eval(_) => break,
+                    _ => panic!(format!("unexpected token: {:?}", tokens)),
                 },
-                None => panic!("expect at least one eval token"),
+                None => break,
             }
         }
         terms
@@ -150,11 +185,11 @@ impl Terms {
         let terms = self.terms.into_iter();
         for term in terms {
             match term {
-                Term::Leaf(operator, num) => {
+                Term::Single(operator, num) => {
                     s = add_op(operator, s);
                     s += &num.to_string()
                 }
-                Term::Node(operator, terms) => {
+                Term::Paren(operator, terms) => {
                     s = add_op(operator, s);
                     s += "(";
                     s += &terms.to_string();
@@ -179,8 +214,8 @@ impl Terms {
         for (i, term) in terms.enumerate() {
             if i == 0 {
                 match term {
-                    Term::Leaf(_, num) => new_terms.push(Term::Leaf(String::from(""), num)),
-                    Term::Node(_, v) => new_terms.push(Term::Node(String::from(""), v)),
+                    Term::Single(_, num) => new_terms.push(Term::Single(String::from(""), num)),
+                    Term::Paren(_, v) => new_terms.push(Term::Paren(String::from(""), v)),
                     Term::If(_, v) => new_terms.push(Term::If(String::from(""), v)),
                 }
             } else {

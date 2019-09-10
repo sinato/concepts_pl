@@ -41,8 +41,8 @@ impl Expression {
         if terms.len() == 1 {
             let term = terms.pop().expect("");
             match term {
-                Term::Leaf(_, num) => Expression::Int(num, origin_terms),
-                Term::Node(_, terms) => Expression::new(terms, origin_terms),
+                Term::Single(_, num) => Expression::Int(num, origin_terms),
+                Term::Paren(_, terms) => Expression::new(terms, origin_terms),
                 Term::If(_, if_terms) => Expression::create_if(if_terms, origin_terms),
             }
         } else {
