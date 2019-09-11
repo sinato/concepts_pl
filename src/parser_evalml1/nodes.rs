@@ -10,6 +10,7 @@ pub enum RuleNode {
     EIfInt(EIfIntNode),
     EIfError(EIfErrorNode),
     EIfT(EIfTNode),
+    EIfTError(EIfTErrorNode),
     EIfF(EIfFNode),
     EPlus(EPlusNode),
     EPlusErrorL(EPlusErrorLNode),
@@ -17,6 +18,7 @@ pub enum RuleNode {
     ETimes(ETimesNode),
     EMinus(EMinusNode),
     ELt(ELtNode),
+    ELtBoolR(ELtBoolRNode),
 }
 impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
@@ -32,6 +34,7 @@ impl RuleNode {
             RuleNode::EIfInt(node) => node.show(w, depth, with_newline),
             RuleNode::EIfError(node) => node.show(w, depth, with_newline),
             RuleNode::EIfT(node) => node.show(w, depth, with_newline),
+            RuleNode::EIfTError(node) => node.show(w, depth, with_newline),
             RuleNode::EIfF(node) => node.show(w, depth, with_newline),
             RuleNode::EPlus(node) => node.show(w, depth, with_newline),
             RuleNode::EPlusErrorL(node) => node.show(w, depth, with_newline),
@@ -39,6 +42,7 @@ impl RuleNode {
             RuleNode::ETimes(node) => node.show(w, depth, with_newline),
             RuleNode::EMinus(node) => node.show(w, depth, with_newline),
             RuleNode::ELt(node) => node.show(w, depth, with_newline),
+            RuleNode::ELtBoolR(node) => node.show(w, depth, with_newline),
         }
     }
 }
@@ -47,8 +51,7 @@ impl RuleNode {
 pub enum Value {
     Int(i32),
     Bool(String),
-    ErrorL,
-    ErrorR,
+    Error,
 }
 impl Add for Value {
     type Output = Self;
@@ -57,9 +60,9 @@ impl Add for Value {
         match self {
             Value::Int(num1) => match other {
                 Value::Int(num2) => Value::Int(num1 + num2),
-                _ => Value::ErrorR,
+                _ => Value::Error,
             },
-            _ => Value::ErrorL,
+            _ => Value::Error,
         }
     }
 }
@@ -70,9 +73,9 @@ impl Sub for Value {
         match self {
             Value::Int(num1) => match other {
                 Value::Int(num2) => Value::Int(num1 - num2),
-                _ => Value::ErrorR,
+                _ => Value::Error,
             },
-            _ => Value::ErrorL,
+            _ => Value::Error,
         }
     }
 }
@@ -83,9 +86,9 @@ impl Mul for Value {
         match self {
             Value::Int(num1) => match other {
                 Value::Int(num2) => Value::Int(num1 * num2),
-                _ => Value::ErrorR,
+                _ => Value::Error,
             },
-            _ => Value::ErrorL,
+            _ => Value::Error,
         }
     }
 }
@@ -100,9 +103,9 @@ impl Value {
                         Value::Bool(String::from("false"))
                     }
                 }
-                _ => Value::ErrorR,
+                _ => Value::Error,
             },
-            _ => Value::ErrorL,
+            _ => Value::Error,
         }
     }
 
@@ -213,11 +216,12 @@ impl Expression {
                         },
                         Value::Bool(_) => match operator.as_ref() {
                             "+" => RuleNode::EPlusBoolR(EPlusBoolRNode { e1, e2 }),
+                            "<" => RuleNode::ELtBoolR(ELtBoolRNode { e1, e2 }),
                             _ => panic!("todo"),
                         },
                         _ => panic!("todo"),
                     },
-                    Value::ErrorR | Value::ErrorL => match e2.get_val() {
+                    Value::Error => match e2.get_val() {
                         Value::Int(_) => match operator.as_ref() {
                             "+" => RuleNode::EPlusErrorL(EPlusErrorLNode { e1, e2 }),
                             _ => panic!("todo"),
@@ -229,8 +233,8 @@ impl Expression {
             }
             Expression::If(box_condition_exp, box_then_exp, box_else_exp, _) => {
                 let cond_val = box_condition_exp.get_val();
-                let _then_val = box_then_exp.get_val();
-                let _else_val = box_else_exp.get_val();
+                let then_val = box_then_exp.get_val();
+                let else_val = box_else_exp.get_val();
                 /*
                 println!("cond_val:  {:?}", cond_val);
                 println!("then_val:  {:?}", then_val);
@@ -238,16 +242,26 @@ impl Expression {
                 */
                 match cond_val {
                     Value::Bool(b) => match b.as_ref() {
-                        "true" => RuleNode::EIfT(EIfTNode {
-                            condition_exp: *box_condition_exp,
-                            then_exp: *box_then_exp,
-                            else_exp: *box_else_exp,
-                        }),
-                        "false" => RuleNode::EIfF(EIfFNode {
-                            condition_exp: *box_condition_exp,
-                            then_exp: *box_then_exp,
-                            else_exp: *box_else_exp,
-                        }),
+                        "true" => match then_val {
+                            Value::Int(_) => RuleNode::EIfT(EIfTNode {
+                                condition_exp: *box_condition_exp,
+                                then_exp: *box_then_exp,
+                                else_exp: *box_else_exp,
+                            }),
+                            _ => RuleNode::EIfTError(EIfTErrorNode {
+                                condition_exp: *box_condition_exp,
+                                then_exp: *box_then_exp,
+                                else_exp: *box_else_exp,
+                            }),
+                        },
+                        "false" => match else_val {
+                            Value::Int(_) => RuleNode::EIfF(EIfFNode {
+                                condition_exp: *box_condition_exp,
+                                then_exp: *box_then_exp,
+                                else_exp: *box_else_exp,
+                            }),
+                            _ => panic!("todo"),
+                        },
                         _ => panic!("expects true or false"),
                     },
                     _ => RuleNode::EIfInt(EIfIntNode {
@@ -361,6 +375,30 @@ impl EIfTNode {
             get_depth_space(depth),
             self.condition_exp.clone().to_string(),
             self.then_exp.get_val().to_string(),
+        );
+        let condition_premise = self.condition_exp.get_rule();
+        let then_premise = self.then_exp.get_rule();
+        let _ = condition_premise.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+        let _ = then_premise.show(w, depth + 2, true);
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EIfTErrorNode {
+    condition_exp: Expression,
+    then_exp: Expression,
+    else_exp: Expression,
+}
+impl EIfTErrorNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} evalto error by E-IfTError {{\n",
+            get_depth_space(depth),
+            self.condition_exp.clone().to_string(),
         );
         let condition_premise = self.condition_exp.get_rule();
         let then_premise = self.then_exp.get_rule();
@@ -537,6 +575,27 @@ impl ELtNode {
         let premise = BLtNode { i1, i2 };
         let _ = premise.show(w, depth + 2, true);
 
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ELtBoolRNode {
+    e1: Expression,
+    e2: Expression,
+}
+impl ELtBoolRNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} < {} evalto error by E-LtBoolR {{\n",
+            get_depth_space(depth),
+            self.e1.clone().to_string(),
+            self.e2.clone().to_string(),
+        );
+        let premise = self.e2.get_rule();
+        let _ = premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
     }

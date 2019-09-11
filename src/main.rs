@@ -5,7 +5,7 @@ use concepts_pl::parser_evalml1::derive;
 use std::io;
 
 fn main() {
-    let judgement = "if 2 + 3 then 1 else 3 evalto error";
+    let judgement = "if 3 < 4 then 1 < true else 3 - false evalto error";
 
     println!("judgement ========================");
     println!("{}", judgement);

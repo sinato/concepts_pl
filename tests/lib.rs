@@ -251,3 +251,10 @@ fn test_question032() {
     let expect = "tests/expects/question032";
     run_test2(judgement, expect);
 }
+
+#[test]
+fn test_question033() {
+    let judgement = "if 3 < 4 then 1 < true else 3 - false evalto error";
+    let expect = "tests/expects/question033";
+    run_test2(judgement, expect);
+}
