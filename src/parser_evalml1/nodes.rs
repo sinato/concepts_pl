@@ -7,7 +7,10 @@ use std::ops::{Add, Mul, Sub};
 pub enum RuleNode {
     EInt(EIntNode),
     EBool(EBoolNode),
+    EIfInt(EIfIntNode),
+    EIfError(EIfErrorNode),
     EIfT(EIfTNode),
+    EIfF(EIfFNode),
     EPlus(EPlusNode),
     EPlusErrorL(EPlusErrorLNode),
     EPlusBoolR(EPlusBoolRNode),
@@ -26,7 +29,10 @@ impl RuleNode {
         match self {
             RuleNode::EInt(node) => node.show(w, depth, with_newline),
             RuleNode::EBool(node) => node.show(w, depth, with_newline),
+            RuleNode::EIfInt(node) => node.show(w, depth, with_newline),
+            RuleNode::EIfError(node) => node.show(w, depth, with_newline),
             RuleNode::EIfT(node) => node.show(w, depth, with_newline),
+            RuleNode::EIfF(node) => node.show(w, depth, with_newline),
             RuleNode::EPlus(node) => node.show(w, depth, with_newline),
             RuleNode::EPlusErrorL(node) => node.show(w, depth, with_newline),
             RuleNode::EPlusBoolR(node) => node.show(w, depth, with_newline),
@@ -89,9 +95,9 @@ impl Value {
             Value::Int(num1) => match other {
                 Value::Int(num2) => {
                     if num1 < num2 {
-                        Value::Int(1)
+                        Value::Bool(String::from("true"))
                     } else {
-                        Value::Int(0)
+                        Value::Bool(String::from("false"))
                     }
                 }
                 _ => Value::ErrorR,
@@ -169,10 +175,13 @@ impl Expression {
                 }
             }
             Expression::If(box_condition_exp, box_if_exp, box_else_exp, _) => {
-                if let Value::Int(1) = box_condition_exp.get_val() {
-                    box_if_exp.get_val()
-                } else {
-                    box_else_exp.get_val()
+                match box_condition_exp.get_val() {
+                    Value::Bool(b) => match b.as_ref() {
+                        "true" => box_if_exp.get_val(),
+                        "false" => box_else_exp.get_val(),
+                        _ => panic!("expects true or false"),
+                    },
+                    _ => panic!("expects boolean value"),
                 }
             }
         }
@@ -218,15 +227,34 @@ impl Expression {
                     _ => panic!("todo"),
                 }
             }
-            Expression::If(box_condition_exp, box_if_exp, box_else_exp, _) => {
-                if let Value::Int(1) = box_condition_exp.get_val() {
-                    RuleNode::EIfT(EIfTNode {
+            Expression::If(box_condition_exp, box_then_exp, box_else_exp, _) => {
+                let cond_val = box_condition_exp.get_val();
+                let _then_val = box_then_exp.get_val();
+                let _else_val = box_else_exp.get_val();
+                /*
+                println!("cond_val:  {:?}", cond_val);
+                println!("then_val:  {:?}", then_val);
+                println!("else_val:  {:?}", else_val);
+                */
+                match cond_val {
+                    Value::Bool(b) => match b.as_ref() {
+                        "true" => RuleNode::EIfT(EIfTNode {
+                            condition_exp: *box_condition_exp,
+                            then_exp: *box_then_exp,
+                            else_exp: *box_else_exp,
+                        }),
+                        "false" => RuleNode::EIfF(EIfFNode {
+                            condition_exp: *box_condition_exp,
+                            then_exp: *box_then_exp,
+                            else_exp: *box_else_exp,
+                        }),
+                        _ => panic!("expects true or false"),
+                    },
+                    _ => RuleNode::EIfInt(EIfIntNode {
                         condition_exp: *box_condition_exp,
-                        then_exp: *box_if_exp,
+                        then_exp: *box_then_exp,
                         else_exp: *box_else_exp,
-                    })
-                } else {
-                    panic!("todo")
+                    }),
                 }
             }
         }
@@ -278,6 +306,48 @@ impl EBoolNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct EIfIntNode {
+    condition_exp: Expression,
+    then_exp: Expression,
+    else_exp: Expression,
+}
+impl EIfIntNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} evalto error by E-IfInt {{\n",
+            get_depth_space(depth),
+            self.condition_exp.clone().to_string(),
+        );
+        let condition_premise = self.condition_exp.get_rule();
+        let _ = condition_premise.show(w, depth + 2, true);
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EIfErrorNode {
+    condition_exp: Expression,
+    then_exp: Expression,
+    else_exp: Expression,
+}
+impl EIfErrorNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} evalto error by E-IfError {{\n",
+            get_depth_space(depth),
+            self.condition_exp.clone().to_string(),
+        );
+        let condition_premise = self.condition_exp.get_rule();
+        let _ = condition_premise.show(w, depth + 2, true);
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct EIfTNode {
     condition_exp: Expression,
     then_exp: Expression,
@@ -297,6 +367,31 @@ impl EIfTNode {
         let _ = condition_premise.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = then_premise.show(w, depth + 2, true);
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EIfFNode {
+    condition_exp: Expression,
+    then_exp: Expression,
+    else_exp: Expression,
+}
+impl EIfFNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} evalto {} by E-IfF {{\n",
+            get_depth_space(depth),
+            self.condition_exp.clone().to_string(),
+            self.else_exp.get_val().to_string(),
+        );
+        let condition_premise = self.condition_exp.get_rule();
+        let else_premise = self.else_exp.get_rule();
+        let _ = condition_premise.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+        let _ = else_premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
     }
@@ -417,10 +512,10 @@ impl ELtNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         let i1 = self.e1.get_val();
         let i2 = self.e2.get_val();
-        let b = if i1.comp(&i2) == Value::Int(1) {
-            "true"
-        } else {
-            "false"
+
+        let b = match i1.comp(&i2) {
+            Value::Bool(val) => val,
+            _ => panic!("expects a boolean value"),
         };
         let _ = write!(
             w,
