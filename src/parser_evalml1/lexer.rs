@@ -4,7 +4,9 @@ use regex::Regex;
 pub enum Token {
     Int(String),
     Op(String),
+    Bool(String),
     Eval(String),
+    ERR,
     PS,
     PE,
     IF,
@@ -34,6 +36,13 @@ impl Tokens {
             _ => panic!(""),
         }
     }
+    pub fn consume_bool(&mut self) -> String {
+        let token = self.pop().expect("");
+        match token {
+            Token::Bool(val) => val,
+            _ => panic!(""),
+        }
+    }
     pub fn consume_op(&mut self) -> String {
         let token = self.pop().expect("");
         match token {
@@ -54,6 +63,8 @@ impl Lexer {
         let token_patterns = vec![
             ("MINT", r"-[1-9][0-9]*"),
             ("INT", r"[1-9][0-9]*"),
+            ("BOOL", r"(true|false)"),
+            ("ERR", r"error"),
             ("OP", r"\+|-|\*|<"),
             ("PS", r"\("),
             ("PE", r"\)"),
@@ -86,6 +97,8 @@ impl Lexer {
             match typ.as_ref() {
                 "MINT" => tokens.push(Token::Int(val)),
                 "INT" => tokens.push(Token::Int(val)),
+                "BOOL" => tokens.push(Token::Bool(val)),
+                "ERR" => tokens.push(Token::ERR),
                 "OP" => tokens.push(Token::Op(val)),
                 "EVAL" => tokens.push(Token::Eval(val)),
                 "PS" => tokens.push(Token::PS),

@@ -5,6 +5,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub enum Term {
     Single(String, i32),
+    SingleB(String, String),
     Paren(String, Terms),
     If(String, IfTerms),
 }
@@ -21,6 +22,10 @@ impl Term {
                 let num = tokens.consume_num();
                 Term::Single(operator, num)
             }
+            Token::Bool(_) => {
+                let b = tokens.consume_bool();
+                Term::SingleB(operator, b)
+            }
             Token::IF => {
                 let if_terms = IfTerms::new(tokens);
                 Term::If(operator, if_terms)
@@ -31,6 +36,7 @@ impl Term {
     fn get_operator(&self) -> String {
         match self {
             Term::Single(op, _) => op.to_string(),
+            Term::SingleB(op, _) => op.to_string(),
             Term::Paren(op, _) => op.to_string(),
             Term::If(op, _) => op.to_string(),
         }
@@ -189,6 +195,10 @@ impl Terms {
                     s = add_op(operator, s);
                     s += &num.to_string()
                 }
+                Term::SingleB(operator, val) => {
+                    s = add_op(operator, s);
+                    s += &val
+                }
                 Term::Paren(operator, terms) => {
                     s = add_op(operator, s);
                     s += "(";
@@ -215,6 +225,7 @@ impl Terms {
             if i == 0 {
                 match term {
                     Term::Single(_, num) => new_terms.push(Term::Single(String::from(""), num)),
+                    Term::SingleB(_, val) => new_terms.push(Term::SingleB(String::from(""), val)),
                     Term::Paren(_, v) => new_terms.push(Term::Paren(String::from(""), v)),
                     Term::If(_, v) => new_terms.push(Term::If(String::from(""), v)),
                 }
