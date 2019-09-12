@@ -1,5 +1,5 @@
 use super::lexer::{Token, Tokens};
-use super::terms::{IfTerms, Term, Terms};
+use super::terms::{IfTerms, LetTerms, Term, Terms};
 use std::io::{self, Write};
 use std::ops::{Add, Mul, Sub};
 
@@ -9,6 +9,7 @@ pub enum RuleNode {
     EBool(EBoolNode),
     EVar1(EVar1Node),
     EVar2(EVar2Node),
+    ELet(ELetNode),
     EIfInt(EIfIntNode),
     EIfError(EIfErrorNode),
     EIfT(EIfTNode),
@@ -40,6 +41,7 @@ impl RuleNode {
             RuleNode::EBool(node) => node.show(w, depth, with_newline),
             RuleNode::EVar1(node) => node.show(w, depth, with_newline),
             RuleNode::EVar2(node) => node.show(w, depth, with_newline),
+            RuleNode::ELet(node) => node.show(w, depth, with_newline),
             RuleNode::EIfInt(node) => node.show(w, depth, with_newline),
             RuleNode::EIfError(node) => node.show(w, depth, with_newline),
             RuleNode::EIfT(node) => node.show(w, depth, with_newline),
@@ -198,18 +200,21 @@ impl Environment {
         tokens.pop(); // consume |-
         Environment { x, y }
     }
-
     fn to_string(self) -> String {
-        let s = "".to_string();
-        let s = match self.x {
-            Some(val) => s + &format!("x = {}", val.to_string()),
-            None => s,
-        };
-        let s = match self.y {
-            Some(val) => s + &format!(", y = {}", val.to_string()),
-            None => s,
-        };
-        s.to_string()
+        if self.get_some_num() == 0 {
+            String::from("|- ")
+        } else {
+            let mut s = "".to_string();
+            s = match self.x {
+                Some(val) => s + &format!("x = {}", val.to_string()),
+                None => s,
+            };
+            s = match self.y {
+                Some(val) => s + &format!(", y = {}", val.to_string()),
+                None => s,
+            };
+            s + " |- "
+        }
     }
 
     fn get_some_num(&self) -> usize {
@@ -229,6 +234,7 @@ pub enum Expression {
     Value(Value, Terms),
     Bin(String, Box<Expression>, Box<Expression>, Terms),
     If(Box<Expression>, Box<Expression>, Box<Expression>, Terms),
+    Let(String, Box<Expression>, Box<Expression>, Terms),
 }
 impl Expression {
     fn new(env: Environment, mut terms: Terms, origin_terms: Terms) -> Expression {
@@ -240,7 +246,7 @@ impl Expression {
                 Term::Val(_, val) => Expression::Value(Value::Val(val), origin_terms),
                 Term::Paren(_, terms) => Expression::new(env, terms, origin_terms),
                 Term::If(_, if_terms) => Expression::create_if(env, if_terms, origin_terms),
-                _ => panic!("todo"),
+                Term::Let(_, let_terms) => Expression::create_let(env, let_terms, origin_terms),
             }
         } else {
             let (split_position, split_operator) = terms.get_split_position();
@@ -254,7 +260,6 @@ impl Expression {
             Expression::Bin(split_operator, Box::new(e1), Box::new(e2), origin_terms)
         }
     }
-
     fn create_if(environment: Environment, if_terms: IfTerms, origin_terms: Terms) -> Expression {
         let condition_exp = Box::new(Expression::new(
             environment.clone(),
@@ -272,6 +277,23 @@ impl Expression {
             origin_terms.clone(),
         ));
         Expression::If(condition_exp, if_exp, else_exp, origin_terms)
+    }
+    fn create_let(
+        environment: Environment,
+        let_terms: LetTerms,
+        origin_terms: Terms,
+    ) -> Expression {
+        let equal_exp = Box::new(Expression::new(
+            environment.clone(),
+            let_terms.equal_terms,
+            origin_terms.clone(),
+        ));
+        let in_exp = Box::new(Expression::new(
+            environment.clone(),
+            let_terms.in_terms,
+            origin_terms.clone(),
+        ));
+        Expression::Let(let_terms.val, equal_exp, in_exp, origin_terms)
     }
     fn get_val(&self, env: &Environment) -> Value {
         match self.clone() {
@@ -300,6 +322,7 @@ impl Expression {
                     _ => panic!("expects boolean value"),
                 }
             }
+            _ => panic!("todo"),
         }
     }
     fn get_rule(self, env: Environment) -> RuleNode {
@@ -437,6 +460,12 @@ impl Expression {
                     _ => panic!("todo"),
                 }
             }
+            Expression::Let(val, box_equal_exp, box_in_exp, _) => RuleNode::ELet(ELetNode {
+                env,
+                val,
+                equal_exp: *box_equal_exp,
+                in_exp: *box_in_exp,
+            }),
         }
     }
     fn to_string(self) -> String {
@@ -444,6 +473,7 @@ impl Expression {
             Expression::Value(_, terms) => terms,
             Expression::Bin(_, _, _, terms) => terms,
             Expression::If(_, _, _, terms) => terms,
+            _ => panic!("todo"),
         };
         origin_terms.to_string()
     }
@@ -459,7 +489,7 @@ impl EIntNode {
         let nl = if with_newline { "\n" } else { "" };
         write!(
             w,
-            "{}{} |- {} evalto {} by E-Int {{}}{}",
+            "{}{}{} evalto {} by E-Int {{}}{}",
             get_depth_space(depth),
             self.env.to_string(),
             self.i,
@@ -497,7 +527,7 @@ impl EVar1Node {
         let nl = if with_newline { "\n" } else { "" };
         write!(
             w,
-            "{}{} |- {} evalto {} by E-Var1 {{}}{}",
+            "{}{}{} evalto {} by E-Var1 {{}}{}",
             get_depth_space(depth),
             self.env.clone().to_string(),
             self.val.clone().to_string(),
@@ -516,7 +546,7 @@ impl EVar2Node {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         let _ = write!(
             w,
-            "{}{} |- {} evalto {} by E-Var2 {{\n",
+            "{}{}{} evalto {} by E-Var2 {{\n",
             get_depth_space(depth),
             self.env.clone().to_string(),
             self.val.clone().to_string(),
@@ -526,12 +556,44 @@ impl EVar2Node {
         nenv.y = None;
         let _ = write!(
             w,
-            "{}{} |- {} evalto {} by E-Var1 {{}}\n",
+            "{}{}{} evalto {} by E-Var1 {{}}\n",
             get_depth_space(depth + 2),
             nenv.clone().to_string(),
             self.val.clone().to_string(),
             self.val.get_val(&self.env).to_string(),
         );
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ELetNode {
+    env: Environment,
+    val: String,
+    equal_exp: Expression,
+    in_exp: Expression,
+}
+impl ELetNode {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let mut new_env = self.env.clone();
+        new_env.x = Some(self.equal_exp.get_val(&self.env));
+
+        let _ = write!(
+            w,
+            "{}{}{} evalto {} by E-Let {{\n",
+            get_depth_space(depth),
+            self.env.clone().to_string(),
+            self.equal_exp.clone().to_string(),
+            self.in_exp.get_val(&new_env).to_string(),
+        );
+
+        let equal_premise = self.equal_exp.get_rule(self.env);
+        let in_premise = self.in_exp.get_rule(new_env);
+
+        let _ = equal_premise.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+        let _ = in_premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
     }
@@ -592,7 +654,7 @@ impl EIfTNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         let _ = write!(
             w,
-            "{}{} |- {} evalto {} by E-IfT {{\n",
+            "{}{}{} evalto {} by E-IfT {{\n",
             self.env.clone().to_string(),
             get_depth_space(depth),
             self.condition_exp.clone().to_string(),
@@ -671,7 +733,7 @@ impl EPlusNode {
         let i2 = self.e2.get_val(&self.env).get_num();
         let _ = write!(
             w,
-            "{}{} |- {} + {} evalto {} by E-Plus {{\n",
+            "{}{}{} + {} evalto {} by E-Plus {{\n",
             get_depth_space(depth),
             self.env.clone().to_string(),
             self.e1.clone().to_string(),
@@ -749,8 +811,9 @@ impl ETimesNode {
         let i2 = self.e2.get_val(&self.env).get_num();
         let _ = write!(
             w,
-            "{}{} * {} evalto {} by E-Times {{\n",
+            "{}{}{} * {} evalto {} by E-Times {{\n",
             get_depth_space(depth),
+            self.env.clone().to_string(),
             self.e1.clone().to_string(),
             self.e2.clone().to_string(),
             i1 * i2

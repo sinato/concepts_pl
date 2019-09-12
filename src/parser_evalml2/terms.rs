@@ -36,6 +36,10 @@ impl Term {
                 let if_terms = IfTerms::new(tokens);
                 Term::If(operator, if_terms)
             }
+            Token::LET => {
+                let let_terms = LetTerms::new(tokens);
+                Term::Let(operator, let_terms)
+            }
             _ => panic!("unexpect"),
         }
     }
@@ -85,9 +89,13 @@ fn consume_expression_terms(tokens: &mut Tokens) -> Terms {
                     let op = tokens.consume_op();
                     terms.push(Term::new(tokens, op));
                 }
-                Token::IF | Token::ELSE | Token::THEN | Token::LET | Token::Eval(_) | Token::PE => {
-                    break
-                }
+                Token::IF
+                | Token::ELSE
+                | Token::THEN
+                | Token::LET
+                | Token::IN
+                | Token::Eval(_)
+                | Token::PE => break,
                 _ => panic!(format!("unexpected token: {:?}", tokens)),
             },
             None => break,
@@ -256,7 +264,15 @@ impl Terms {
                         if_terms.else_terms.to_string()
                     )
                 }
-                _ => panic!("todo"),
+                Term::Let(operator, let_terms) => {
+                    s = add_op(operator, s);
+                    s += &format!(
+                        "let {} = {} in {}",
+                        let_terms.val,
+                        let_terms.equal_terms.to_string(),
+                        let_terms.in_terms.to_string(),
+                    )
+                }
             }
         }
         s
