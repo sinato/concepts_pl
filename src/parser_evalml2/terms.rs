@@ -6,8 +6,10 @@ use std::collections::HashMap;
 pub enum Term {
     Single(String, i32),
     SingleB(String, String),
+    Val(String, String),
     Paren(String, Terms),
     If(String, IfTerms),
+    Let(String, LetTerms),
 }
 
 impl Term {
@@ -21,6 +23,10 @@ impl Term {
             Token::Int(_) => {
                 let num = tokens.consume_num();
                 Term::Single(operator, num)
+            }
+            Token::Val(_) => {
+                let val = tokens.consume_val();
+                Term::Val(operator, val)
             }
             Token::Bool(_) => {
                 let b = tokens.consume_bool();
@@ -39,6 +45,7 @@ impl Term {
             Term::SingleB(op, _) => op.to_string(),
             Term::Paren(op, _) => op.to_string(),
             Term::If(op, _) => op.to_string(),
+            _ => panic!("todo"),
         }
     }
 }
@@ -77,7 +84,9 @@ fn consume_expression_terms(tokens: &mut Tokens) -> Terms {
                     let op = tokens.consume_op();
                     terms.push(Term::new(tokens, op));
                 }
-                Token::IF | Token::ELSE | Token::THEN | Token::Eval(_) | Token::PE => break,
+                Token::IF | Token::ELSE | Token::THEN | Token::LET | Token::Eval(_) | Token::PE => {
+                    break
+                }
                 _ => panic!(format!("unexpected token: {:?}", tokens)),
             },
             None => break,
@@ -104,6 +113,34 @@ impl IfTerms {
             condition_terms,
             then_terms,
             else_terms,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LetTerms {
+    pub val: String,
+    pub equal_terms: Terms,
+    pub in_terms: Terms,
+}
+impl LetTerms {
+    pub fn new(tokens: &mut Tokens) -> LetTerms {
+        tokens.pop(); // consume let
+        let val = match tokens.pop() {
+            Some(token) => match token {
+                Token::XEQ => "x".to_string(),
+                Token::YEQ => "y".to_string(),
+                _ => panic!("expects x or y"),
+            },
+            None => panic!("ecpects x or y"),
+        };
+        let equal_terms = consume_expression_terms(tokens);
+        tokens.pop(); // consume in
+        let in_terms = consume_expression_terms(tokens);
+        LetTerms {
+            val,
+            equal_terms,
+            in_terms,
         }
     }
 }
@@ -214,6 +251,7 @@ impl Terms {
                         if_terms.else_terms.to_string()
                     )
                 }
+                _ => panic!("todo"),
             }
         }
         s
@@ -228,6 +266,7 @@ impl Terms {
                     Term::SingleB(_, val) => new_terms.push(Term::SingleB(String::from(""), val)),
                     Term::Paren(_, v) => new_terms.push(Term::Paren(String::from(""), v)),
                     Term::If(_, v) => new_terms.push(Term::If(String::from(""), v)),
+                    _ => panic!("todo"),
                 }
             } else {
                 new_terms.push(term);

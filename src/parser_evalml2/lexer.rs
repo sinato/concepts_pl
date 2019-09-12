@@ -6,10 +6,17 @@ pub enum Token {
     Op(String),
     Bool(String),
     Eval(String),
+    Val(String),
+    ENV,
     ERR,
+    COMMA,
     PS,
+    XEQ,
+    YEQ,
     PE,
     IF,
+    IN,
+    LET,
     THEN,
     ELSE,
 }
@@ -33,6 +40,13 @@ impl Tokens {
         let token = self.pop().expect("");
         match token {
             Token::Int(val) => val.parse().expect(""),
+            _ => panic!(""),
+        }
+    }
+    pub fn consume_val(&mut self) -> String {
+        let token = self.pop().expect("");
+        match token {
+            Token::Val(val) => val,
             _ => panic!(""),
         }
     }
@@ -65,12 +79,19 @@ impl Lexer {
             ("INT", r"[1-9][0-9]*"),
             ("BOOL", r"(true|false)"),
             ("ERR", r"error"),
+            ("ENV", r"\|-"),
             ("OP", r"\+|-|\*|<"),
             ("PS", r"\("),
+            ("XEQ", r"x ="),
+            ("YEQ", r"y ="),
             ("PE", r"\)"),
+            ("COMMA", r","),
             ("IF", r"if"),
             ("THEN", r"then"),
             ("ELSE", r"else"),
+            ("LET", r"let"),
+            ("IN", r"in"),
+            ("VAL", r"(x|y)"),
             ("EVAL", r"evalto"),
         ];
         let re = make_regex(&token_patterns);
@@ -99,11 +120,18 @@ impl Lexer {
                 "INT" => tokens.push(Token::Int(val)),
                 "BOOL" => tokens.push(Token::Bool(val)),
                 "ERR" => tokens.push(Token::ERR),
+                "ENV" => tokens.push(Token::ENV),
+                "VAL" => tokens.push(Token::Val(val)),
                 "OP" => tokens.push(Token::Op(val)),
                 "EVAL" => tokens.push(Token::Eval(val)),
                 "PS" => tokens.push(Token::PS),
+                "XEQ" => tokens.push(Token::XEQ),
+                "YEQ" => tokens.push(Token::YEQ),
+                "COMMA" => tokens.push(Token::COMMA),
                 "PE" => tokens.push(Token::PE),
                 "IF" => tokens.push(Token::IF),
+                "IN" => tokens.push(Token::IN),
+                "LET" => tokens.push(Token::LET),
                 "THEN" => tokens.push(Token::THEN),
                 "ELSE" => tokens.push(Token::ELSE),
                 _ => panic!("unexpected type token"),

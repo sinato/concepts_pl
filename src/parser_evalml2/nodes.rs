@@ -1,4 +1,4 @@
-use super::lexer::Tokens;
+use super::lexer::{Token, Tokens};
 use super::terms::{IfTerms, Term, Terms};
 use std::io::{self, Write};
 use std::ops::{Add, Mul, Sub};
@@ -7,6 +7,8 @@ use std::ops::{Add, Mul, Sub};
 pub enum RuleNode {
     EInt(EIntNode),
     EBool(EBoolNode),
+    EVar1(EVar1Node),
+    EVar2(EVar2Node),
     EIfInt(EIfIntNode),
     EIfError(EIfErrorNode),
     EIfT(EIfTNode),
@@ -22,15 +24,19 @@ pub enum RuleNode {
 }
 impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
+        let environment = Environment::new(tokens);
+
         let terms: Terms = Terms::new(tokens);
-        let expression = Expression::new(terms.clone(), terms);
-        expression.get_rule()
+        let expression = Expression::new(environment.clone(), terms.clone(), terms);
+        expression.get_rule(environment)
     }
 
     pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         match self {
             RuleNode::EInt(node) => node.show(w, depth, with_newline),
             RuleNode::EBool(node) => node.show(w, depth, with_newline),
+            RuleNode::EVar1(node) => node.show(w, depth, with_newline),
+            RuleNode::EVar2(node) => node.show(w, depth, with_newline),
             RuleNode::EIfInt(node) => node.show(w, depth, with_newline),
             RuleNode::EIfError(node) => node.show(w, depth, with_newline),
             RuleNode::EIfT(node) => node.show(w, depth, with_newline),
@@ -51,6 +57,7 @@ impl RuleNode {
 pub enum Value {
     Int(i32),
     Bool(String),
+    Val(String),
     Error,
 }
 impl Add for Value {
@@ -113,15 +120,92 @@ impl Value {
         match self {
             Value::Int(i) => i.to_string(),
             Value::Bool(val) => val,
+            Value::Val(val) => val,
             _ => panic!("todo"),
         }
     }
-
     fn get_num(self) -> i32 {
         match self {
             Value::Int(i) => i,
             _ => panic!("unexpcted"),
         }
+    }
+    fn get_val(self, env: Environment) -> Value {
+        match self {
+            Value::Val(val) => match val.as_ref() {
+                "x" => match env.x {
+                    Some(val) => val,
+                    None => panic!("use of undeclared identifier \'x\'"),
+                },
+                "y" => match env.y {
+                    Some(val) => val,
+                    None => panic!("use of undeclared identifier \'y\'"),
+                },
+                _ => panic!("expects x or y"),
+            },
+            _ => panic!("expects a variable"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Environment {
+    pub x: Option<Value>,
+    pub y: Option<Value>,
+}
+impl Environment {
+    fn new(tokens: &mut Tokens) -> Environment {
+        let x = match tokens.peek() {
+            Some(token) => match token {
+                Token::XEQ => {
+                    tokens.pop(); // consume x =
+                    let num = tokens.consume_num();
+                    Some(Value::Int(num))
+                }
+                Token::ENV => None,
+                _ => panic!("expects x = / |-"),
+            },
+            None => panic!("expects some tokens"),
+        };
+        let y = match tokens.peek() {
+            Some(token) => match token {
+                Token::COMMA => {
+                    tokens.pop(); // consume ,
+                    tokens.pop(); // consume y =
+                    let num = tokens.consume_num();
+                    Some(Value::Int(num))
+                }
+                Token::ENV => None,
+                _ => panic!("expects y = / |-"),
+            },
+            None => panic!("expects some tokens"),
+        };
+        tokens.pop(); // consume |-
+        Environment { x, y }
+    }
+
+    fn to_string(self) -> String {
+        let s = "".to_string();
+        let s = match self.x {
+            Some(val) => s + &format!("x = {}", val.to_string()),
+            None => s,
+        };
+        let s = match self.y {
+            Some(val) => s + &format!(", y = {}", val.to_string()),
+            None => s,
+        };
+        s.to_string()
+    }
+
+    fn get_some_num(&self) -> usize {
+        let mut num = 0;
+        if let Some(_) = self.x {
+            num += 1;
+        }
+        if let Some(_) = self.y {
+            num += 1;
+        }
+        num
     }
 }
 
@@ -132,14 +216,16 @@ pub enum Expression {
     If(Box<Expression>, Box<Expression>, Box<Expression>, Terms),
 }
 impl Expression {
-    fn new(mut terms: Terms, origin_terms: Terms) -> Expression {
+    fn new(env: Environment, mut terms: Terms, origin_terms: Terms) -> Expression {
         if terms.len() == 1 {
             let term = terms.pop().expect("");
             match term {
                 Term::Single(_, num) => Expression::Value(Value::Int(num), origin_terms),
                 Term::SingleB(_, val) => Expression::Value(Value::Bool(val), origin_terms),
-                Term::Paren(_, terms) => Expression::new(terms, origin_terms),
-                Term::If(_, if_terms) => Expression::create_if(if_terms, origin_terms),
+                Term::Val(_, val) => Expression::Value(Value::Val(val), origin_terms),
+                Term::Paren(_, terms) => Expression::new(env, terms, origin_terms),
+                Term::If(_, if_terms) => Expression::create_if(env, if_terms, origin_terms),
+                _ => panic!("todo"),
             }
         } else {
             let (split_position, split_operator) = terms.get_split_position();
@@ -148,19 +234,28 @@ impl Expression {
             println!("before: {:?}", former);
             println!("after: {:?}", latter);
             println!("================================");
-            let e1 = Expression::new(former.clone(), former);
-            let e2 = Expression::new(latter.clone(), latter);
+            let e1 = Expression::new(env.clone(), former.clone(), former);
+            let e2 = Expression::new(env, latter.clone(), latter);
             Expression::Bin(split_operator, Box::new(e1), Box::new(e2), origin_terms)
         }
     }
 
-    fn create_if(if_terms: IfTerms, origin_terms: Terms) -> Expression {
+    fn create_if(environment: Environment, if_terms: IfTerms, origin_terms: Terms) -> Expression {
         let condition_exp = Box::new(Expression::new(
+            environment.clone(),
             if_terms.condition_terms,
             origin_terms.clone(),
         ));
-        let if_exp = Box::new(Expression::new(if_terms.then_terms, origin_terms.clone()));
-        let else_exp = Box::new(Expression::new(if_terms.else_terms, origin_terms.clone()));
+        let if_exp = Box::new(Expression::new(
+            environment.clone(),
+            if_terms.then_terms,
+            origin_terms.clone(),
+        ));
+        let else_exp = Box::new(Expression::new(
+            environment,
+            if_terms.else_terms,
+            origin_terms.clone(),
+        ));
         Expression::If(condition_exp, if_exp, else_exp, origin_terms)
     }
     fn get_val(&self) -> Value {
@@ -189,11 +284,22 @@ impl Expression {
             }
         }
     }
-    fn get_rule(self) -> RuleNode {
+    fn get_rule(self, env: Environment) -> RuleNode {
         match self {
             Expression::Value(value, _) => match value {
                 Value::Int(i) => RuleNode::EInt(EIntNode { i }),
                 Value::Bool(val) => RuleNode::EBool(EBoolNode { val }),
+                Value::Val(val) => match env.get_some_num() {
+                    1 => RuleNode::EVar1(EVar1Node {
+                        env,
+                        val: Value::Val(val),
+                    }),
+                    2 => RuleNode::EVar2(EVar2Node {
+                        env,
+                        val: Value::Val(val),
+                    }),
+                    _ => panic!("unexpected"),
+                },
                 _ => panic!("todo"),
             },
             Expression::Bin(operator, box_ex1, box_ex2, _) => {
@@ -208,22 +314,22 @@ impl Expression {
                 match e1.get_val() {
                     Value::Int(_) => match e2.get_val() {
                         Value::Int(_) => match operator.as_ref() {
-                            "+" => RuleNode::EPlus(EPlusNode { e1, e2 }),
-                            "*" => RuleNode::ETimes(ETimesNode { e1, e2 }),
-                            "-" => RuleNode::EMinus(EMinusNode { e1, e2 }),
-                            "<" => RuleNode::ELt(ELtNode { e1, e2 }),
+                            "+" => RuleNode::EPlus(EPlusNode { env, e1, e2 }),
+                            "*" => RuleNode::ETimes(ETimesNode { env, e1, e2 }),
+                            "-" => RuleNode::EMinus(EMinusNode { env, e1, e2 }),
+                            "<" => RuleNode::ELt(ELtNode { env, e1, e2 }),
                             _ => panic!("todo"),
                         },
                         Value::Bool(_) => match operator.as_ref() {
-                            "+" => RuleNode::EPlusBoolR(EPlusBoolRNode { e1, e2 }),
-                            "<" => RuleNode::ELtBoolR(ELtBoolRNode { e1, e2 }),
+                            "+" => RuleNode::EPlusBoolR(EPlusBoolRNode { env, e1, e2 }),
+                            "<" => RuleNode::ELtBoolR(ELtBoolRNode { env, e1, e2 }),
                             _ => panic!("todo"),
                         },
                         _ => panic!("todo"),
                     },
                     Value::Error => match e2.get_val() {
                         Value::Int(_) => match operator.as_ref() {
-                            "+" => RuleNode::EPlusErrorL(EPlusErrorLNode { e1, e2 }),
+                            "+" => RuleNode::EPlusErrorL(EPlusErrorLNode { env, e1, e2 }),
                             _ => panic!("todo"),
                         },
                         _ => panic!("todo"),
@@ -244,11 +350,13 @@ impl Expression {
                     Value::Bool(b) => match b.as_ref() {
                         "true" => match then_val {
                             Value::Int(_) => RuleNode::EIfT(EIfTNode {
+                                env,
                                 condition_exp: *box_condition_exp,
                                 then_exp: *box_then_exp,
                                 else_exp: *box_else_exp,
                             }),
                             _ => RuleNode::EIfTError(EIfTErrorNode {
+                                env,
                                 condition_exp: *box_condition_exp,
                                 then_exp: *box_then_exp,
                                 else_exp: *box_else_exp,
@@ -256,6 +364,7 @@ impl Expression {
                         },
                         "false" => match else_val {
                             Value::Int(_) => RuleNode::EIfF(EIfFNode {
+                                env,
                                 condition_exp: *box_condition_exp,
                                 then_exp: *box_then_exp,
                                 else_exp: *box_else_exp,
@@ -265,6 +374,7 @@ impl Expression {
                         _ => panic!("expects true or false"),
                     },
                     _ => RuleNode::EIfInt(EIfIntNode {
+                        env,
                         condition_exp: *box_condition_exp,
                         then_exp: *box_then_exp,
                         else_exp: *box_else_exp,
@@ -320,7 +430,56 @@ impl EBoolNode {
 }
 
 #[derive(Debug, Clone)]
+pub struct EVar1Node {
+    env: Environment,
+    val: Value,
+}
+impl EVar1Node {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let nl = if with_newline { "\n" } else { "" };
+        write!(
+            w,
+            "{}{} |- evalto {} by E-Var2 {{}}{}",
+            get_depth_space(depth),
+            self.env.clone().to_string(),
+            self.val.get_val(self.env).to_string(),
+            nl
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EVar2Node {
+    env: Environment,
+    val: Value,
+}
+impl EVar2Node {
+    fn show<W: Write>(mut self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let _ = write!(
+            w,
+            "{}{} |- {} evalto {} by E-Var2 {{\n",
+            get_depth_space(depth),
+            self.env.clone().to_string(),
+            self.val.clone().to_string(),
+            self.val.clone().get_val(self.env.clone()).to_string(),
+        );
+        self.env.y = None;
+        let _ = write!(
+            w,
+            "{}{} |- {} evalto {} by E-Var1 {{}}\n",
+            get_depth_space(depth + 2),
+            self.env.clone().to_string(),
+            self.val.clone().to_string(),
+            self.val.get_val(self.env).to_string(),
+        );
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct EIfIntNode {
+    env: Environment,
     condition_exp: Expression,
     then_exp: Expression,
     else_exp: Expression,
@@ -333,7 +492,7 @@ impl EIfIntNode {
             get_depth_space(depth),
             self.condition_exp.clone().to_string(),
         );
-        let condition_premise = self.condition_exp.get_rule();
+        let condition_premise = self.condition_exp.get_rule(self.env);
         let _ = condition_premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
@@ -342,6 +501,7 @@ impl EIfIntNode {
 
 #[derive(Debug, Clone)]
 pub struct EIfErrorNode {
+    env: Environment,
     condition_exp: Expression,
     then_exp: Expression,
     else_exp: Expression,
@@ -354,7 +514,7 @@ impl EIfErrorNode {
             get_depth_space(depth),
             self.condition_exp.clone().to_string(),
         );
-        let condition_premise = self.condition_exp.get_rule();
+        let condition_premise = self.condition_exp.get_rule(self.env);
         let _ = condition_premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
@@ -363,6 +523,7 @@ impl EIfErrorNode {
 
 #[derive(Debug, Clone)]
 pub struct EIfTNode {
+    env: Environment,
     condition_exp: Expression,
     then_exp: Expression,
     else_exp: Expression,
@@ -376,8 +537,8 @@ impl EIfTNode {
             self.condition_exp.clone().to_string(),
             self.then_exp.get_val().to_string(),
         );
-        let condition_premise = self.condition_exp.get_rule();
-        let then_premise = self.then_exp.get_rule();
+        let condition_premise = self.condition_exp.get_rule(self.env.clone());
+        let then_premise = self.then_exp.get_rule(self.env);
         let _ = condition_premise.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = then_premise.show(w, depth + 2, true);
@@ -388,6 +549,7 @@ impl EIfTNode {
 
 #[derive(Debug, Clone)]
 pub struct EIfTErrorNode {
+    env: Environment,
     condition_exp: Expression,
     then_exp: Expression,
     else_exp: Expression,
@@ -400,8 +562,8 @@ impl EIfTErrorNode {
             get_depth_space(depth),
             self.condition_exp.clone().to_string(),
         );
-        let condition_premise = self.condition_exp.get_rule();
-        let then_premise = self.then_exp.get_rule();
+        let condition_premise = self.condition_exp.get_rule(self.env.clone());
+        let then_premise = self.then_exp.get_rule(self.env);
         let _ = condition_premise.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = then_premise.show(w, depth + 2, true);
@@ -412,6 +574,7 @@ impl EIfTErrorNode {
 
 #[derive(Debug, Clone)]
 pub struct EIfFNode {
+    env: Environment,
     condition_exp: Expression,
     then_exp: Expression,
     else_exp: Expression,
@@ -425,8 +588,8 @@ impl EIfFNode {
             self.condition_exp.clone().to_string(),
             self.else_exp.get_val().to_string(),
         );
-        let condition_premise = self.condition_exp.get_rule();
-        let else_premise = self.else_exp.get_rule();
+        let condition_premise = self.condition_exp.get_rule(self.env.clone());
+        let else_premise = self.else_exp.get_rule(self.env);
         let _ = condition_premise.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = else_premise.show(w, depth + 2, true);
@@ -437,6 +600,7 @@ impl EIfFNode {
 
 #[derive(Debug, Clone)]
 pub struct EPlusNode {
+    env: Environment,
     e1: Expression,
     e2: Expression,
 }
@@ -452,8 +616,8 @@ impl EPlusNode {
             self.e2.clone().to_string(),
             i1 + i2
         );
-        let premise1 = self.e1.get_rule();
-        let premise2 = self.e2.get_rule();
+        let premise1 = self.e1.get_rule(self.env.clone());
+        let premise2 = self.e2.get_rule(self.env);
         let _ = premise1.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = premise2.show(w, depth + 2, false);
@@ -469,6 +633,7 @@ impl EPlusNode {
 
 #[derive(Debug, Clone)]
 pub struct EPlusErrorLNode {
+    env: Environment,
     e1: Expression,
     e2: Expression,
 }
@@ -481,7 +646,7 @@ impl EPlusErrorLNode {
             self.e1.clone().to_string(),
             self.e2.clone().to_string(),
         );
-        let premise = self.e1.get_rule();
+        let premise = self.e1.get_rule(self.env);
         let _ = premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
@@ -490,6 +655,7 @@ impl EPlusErrorLNode {
 
 #[derive(Debug, Clone)]
 pub struct EPlusBoolRNode {
+    env: Environment,
     e1: Expression,
     e2: Expression,
 }
@@ -502,7 +668,7 @@ impl EPlusBoolRNode {
             self.e1.clone().to_string(),
             self.e2.clone().to_string(),
         );
-        let premise = self.e2.get_rule();
+        let premise = self.e2.get_rule(self.env);
         let _ = premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
@@ -511,6 +677,7 @@ impl EPlusBoolRNode {
 
 #[derive(Debug, Clone)]
 pub struct ETimesNode {
+    env: Environment,
     e1: Expression,
     e2: Expression,
 }
@@ -526,8 +693,8 @@ impl ETimesNode {
             self.e2.clone().to_string(),
             i1 * i2
         );
-        let premise1 = self.e1.get_rule();
-        let premise2 = self.e2.get_rule();
+        let premise1 = self.e1.get_rule(self.env.clone());
+        let premise2 = self.e2.get_rule(self.env);
         let _ = premise1.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = premise2.show(w, depth + 2, false);
@@ -543,6 +710,7 @@ impl ETimesNode {
 
 #[derive(Debug, Clone)]
 pub struct ELtNode {
+    env: Environment,
     e1: Expression,
     e2: Expression,
 }
@@ -563,8 +731,8 @@ impl ELtNode {
             self.e2.clone().to_string(),
             b
         );
-        let premise1 = self.e1.get_rule();
-        let premise2 = self.e2.get_rule();
+        let premise1 = self.e1.get_rule(self.env.clone());
+        let premise2 = self.e2.get_rule(self.env);
         let _ = premise1.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = premise2.show(w, depth + 2, false);
@@ -582,6 +750,7 @@ impl ELtNode {
 
 #[derive(Debug, Clone)]
 pub struct ELtBoolRNode {
+    env: Environment,
     e1: Expression,
     e2: Expression,
 }
@@ -594,7 +763,7 @@ impl ELtBoolRNode {
             self.e1.clone().to_string(),
             self.e2.clone().to_string(),
         );
-        let premise = self.e2.get_rule();
+        let premise = self.e2.get_rule(self.env);
         let _ = premise.show(w, depth + 2, true);
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
@@ -603,6 +772,7 @@ impl ELtBoolRNode {
 
 #[derive(Debug, Clone)]
 pub struct EMinusNode {
+    env: Environment,
     e1: Expression,
     e2: Expression,
 }
@@ -618,8 +788,8 @@ impl EMinusNode {
             self.e2.clone().to_string(),
             i1 - i2
         );
-        let premise1 = self.e1.get_rule();
-        let premise2 = self.e2.get_rule();
+        let premise1 = self.e1.get_rule(self.env.clone());
+        let premise2 = self.e2.get_rule(self.env);
         let _ = premise1.show(w, depth + 2, false);
         let _ = write!(w, ";\n");
         let _ = premise2.show(w, depth + 2, false);

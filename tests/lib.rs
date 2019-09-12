@@ -2,6 +2,7 @@ extern crate concepts_pl;
 
 use concepts_pl::chapter1::{derive, DerivationRules};
 use concepts_pl::parser_evalml1::derive as evalml1_derive;
+use concepts_pl::parser_evalml2::derive as evalml2_derive;
 
 use std::{fs, str};
 
@@ -16,12 +17,23 @@ fn run_test(judgement: &str, derivation_rules: DerivationRules, expect_filepath:
     assert_eq!(actual, expect);
 }
 
-fn run_test2(judgement: &str, expect_filepath: &str) {
+fn run_test1(judgement: &str, expect_filepath: &str) {
     let expect: String =
         fs::read_to_string(expect_filepath).expect("something went wrong reading the file.");
 
     let mut buf = Vec::<u8>::new();
     let _ = evalml1_derive(judgement, &mut buf);
+    let actual = str::from_utf8(&buf).expect("expects result str");
+    println!("{:?}", actual);
+    assert_eq!(actual, expect);
+}
+
+fn run_test2(judgement: &str, expect_filepath: &str) {
+    let expect: String =
+        fs::read_to_string(expect_filepath).expect("something went wrong reading the file.");
+
+    let mut buf = Vec::<u8>::new();
+    let _ = evalml2_derive(judgement, &mut buf);
     let actual = str::from_utf8(&buf).expect("expects result str");
     println!("{:?}", actual);
     assert_eq!(actual, expect);
@@ -200,61 +212,68 @@ fn test_question024() {
 fn test_question025() {
     let judgement = "3 + 5 evalto 8";
     let expect = "tests/expects/question025";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question026() {
     let judgement = "8 - 2 - 3 evalto 3";
     let expect = "tests/expects/question026";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question027() {
     let judgement = "(4 + 5) * (1 - 10) evalto -81";
     let expect = "tests/expects/question027";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question028() {
     let judgement = "if 4 < 5 then 2 + 3 else 8 * 8 evalto 5";
     let expect = "tests/expects/question028";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question029() {
     let judgement = "3 + if -23 < -2 * 8 then 8 else 2 + 4 evalto 11";
     let expect = "tests/expects/question029";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question030() {
     let judgement = "3 + (if -23 < -2 * 8 then 8 else 2) + 4 evalto 15";
     let expect = "tests/expects/question030";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question031() {
     let judgement = "1 + true + 2 evalto error";
     let expect = "tests/expects/question031";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question032() {
     let judgement = "if 2 + 3 then 1 else 3 evalto error";
     let expect = "tests/expects/question032";
-    run_test2(judgement, expect);
+    run_test1(judgement, expect);
 }
 
 #[test]
 fn test_question033() {
     let judgement = "if 3 < 4 then 1 < true else 3 - false evalto error";
     let expect = "tests/expects/question033";
+    run_test1(judgement, expect);
+}
+
+#[test]
+fn test_question034() {
+    let judgement = "x = 3, y = 2 |- x evalto 3";
+    let expect = "tests/expects/question034";
     run_test2(judgement, expect);
 }
