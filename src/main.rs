@@ -1,6 +1,6 @@
 extern crate concepts_pl;
 
-use concepts_pl::parser_evalml1::derive;
+use concepts_pl::parser_evalml2::derive;
 
 use std::io;
 
