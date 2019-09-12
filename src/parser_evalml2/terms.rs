@@ -43,9 +43,10 @@ impl Term {
         match self {
             Term::Single(op, _) => op.to_string(),
             Term::SingleB(op, _) => op.to_string(),
+            Term::Val(op, _) => op.to_string(),
             Term::Paren(op, _) => op.to_string(),
             Term::If(op, _) => op.to_string(),
-            _ => panic!("todo"),
+            Term::Let(op, _) => op.to_string(),
         }
     }
 }
@@ -235,6 +236,10 @@ impl Terms {
                 Term::SingleB(operator, val) => {
                     s = add_op(operator, s);
                     s += &val
+                }
+                Term::Val(operator, val) => {
+                    s = add_op(operator, s);
+                    s += &val.to_string()
                 }
                 Term::Paren(operator, terms) => {
                     s = add_op(operator, s);

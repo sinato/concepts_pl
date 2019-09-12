@@ -25,6 +25,9 @@ pub enum RuleNode {
 impl RuleNode {
     pub fn new(tokens: &mut Tokens) -> RuleNode {
         let environment = Environment::new(tokens);
+        println!("++++++++++++++++++++++++");
+        println!("{:?}", environment);
+        println!("++++++++++++++++++++++++");
 
         let terms: Terms = Terms::new(tokens);
         let expression = Expression::new(environment.clone(), terms.clone(), terms);
@@ -130,14 +133,14 @@ impl Value {
             _ => panic!("unexpcted"),
         }
     }
-    fn get_val(self, env: Environment) -> Value {
+    fn get_val(self, env: &Environment) -> Value {
         match self {
             Value::Val(val) => match val.as_ref() {
-                "x" => match env.x {
+                "x" => match env.x.clone() {
                     Some(val) => val,
                     None => panic!("use of undeclared identifier \'x\'"),
                 },
-                "y" => match env.y {
+                "y" => match env.y.clone() {
                     Some(val) => val,
                     None => panic!("use of undeclared identifier \'y\'"),
                 },
@@ -159,8 +162,14 @@ impl Environment {
             Some(token) => match token {
                 Token::XEQ => {
                     tokens.pop(); // consume x =
-                    let num = tokens.consume_num();
-                    Some(Value::Int(num))
+                    match tokens.pop() {
+                        Some(token) => match token {
+                            Token::Int(num) => Some(Value::Int(num.parse().expect(""))),
+                            Token::Bool(val) => Some(Value::Bool(val)),
+                            _ => panic!("todo"),
+                        },
+                        None => panic!("unexpected"),
+                    }
                 }
                 Token::ENV => None,
                 _ => panic!("expects x = / |-"),
@@ -172,8 +181,14 @@ impl Environment {
                 Token::COMMA => {
                     tokens.pop(); // consume ,
                     tokens.pop(); // consume y =
-                    let num = tokens.consume_num();
-                    Some(Value::Int(num))
+                    match tokens.pop() {
+                        Some(token) => match token {
+                            Token::Int(num) => Some(Value::Int(num.parse().expect(""))),
+                            Token::Bool(val) => Some(Value::Bool(val)),
+                            _ => panic!("todo"),
+                        },
+                        None => panic!("unexpected"),
+                    }
                 }
                 Token::ENV => None,
                 _ => panic!("expects y = / |-"),
@@ -258,12 +273,15 @@ impl Expression {
         ));
         Expression::If(condition_exp, if_exp, else_exp, origin_terms)
     }
-    fn get_val(&self) -> Value {
+    fn get_val(&self, env: &Environment) -> Value {
         match self.clone() {
-            Expression::Value(val, _) => val,
+            Expression::Value(val, _) => match val.clone() {
+                Value::Val(_) => val.get_val(env),
+                _ => val,
+            },
             Expression::Bin(operator, box_ex1, box_ex2, _) => {
-                let val1 = box_ex1.get_val();
-                let val2 = box_ex2.get_val();
+                let val1 = box_ex1.get_val(env);
+                let val2 = box_ex2.get_val(env);
                 match operator.as_ref() {
                     "+" => val1 + val2,
                     "-" => val1 - val2,
@@ -273,10 +291,10 @@ impl Expression {
                 }
             }
             Expression::If(box_condition_exp, box_if_exp, box_else_exp, _) => {
-                match box_condition_exp.get_val() {
+                match box_condition_exp.get_val(env) {
                     Value::Bool(b) => match b.as_ref() {
-                        "true" => box_if_exp.get_val(),
-                        "false" => box_else_exp.get_val(),
+                        "true" => box_if_exp.get_val(env),
+                        "false" => box_else_exp.get_val(env),
                         _ => panic!("expects true or false"),
                     },
                     _ => panic!("expects boolean value"),
@@ -287,17 +305,24 @@ impl Expression {
     fn get_rule(self, env: Environment) -> RuleNode {
         match self {
             Expression::Value(value, _) => match value {
-                Value::Int(i) => RuleNode::EInt(EIntNode { i }),
+                Value::Int(i) => RuleNode::EInt(EIntNode { env, i }),
                 Value::Bool(val) => RuleNode::EBool(EBoolNode { val }),
                 Value::Val(val) => match env.get_some_num() {
                     1 => RuleNode::EVar1(EVar1Node {
                         env,
                         val: Value::Val(val),
                     }),
-                    2 => RuleNode::EVar2(EVar2Node {
-                        env,
-                        val: Value::Val(val),
-                    }),
+                    2 => match val.as_ref() {
+                        "x" => RuleNode::EVar2(EVar2Node {
+                            env,
+                            val: Value::Val(val),
+                        }),
+                        "y" => RuleNode::EVar1(EVar1Node {
+                            env,
+                            val: Value::Val(val),
+                        }),
+                        _ => panic!("expects x or y"),
+                    },
                     _ => panic!("unexpected"),
                 },
                 _ => panic!("todo"),
@@ -311,8 +336,9 @@ impl Expression {
                 println!("e2: {:?}\t{:?}", e2.get_val(), e2);
                 println!("================================");
                 */
-                match e1.get_val() {
-                    Value::Int(_) => match e2.get_val() {
+
+                match e1.get_val(&env) {
+                    Value::Int(_) => match e2.get_val(&env) {
                         Value::Int(_) => match operator.as_ref() {
                             "+" => RuleNode::EPlus(EPlusNode { env, e1, e2 }),
                             "*" => RuleNode::ETimes(ETimesNode { env, e1, e2 }),
@@ -327,7 +353,7 @@ impl Expression {
                         },
                         _ => panic!("todo"),
                     },
-                    Value::Error => match e2.get_val() {
+                    Value::Error => match e2.get_val(&env) {
                         Value::Int(_) => match operator.as_ref() {
                             "+" => RuleNode::EPlusErrorL(EPlusErrorLNode { env, e1, e2 }),
                             _ => panic!("todo"),
@@ -338,15 +364,15 @@ impl Expression {
                 }
             }
             Expression::If(box_condition_exp, box_then_exp, box_else_exp, _) => {
-                let cond_val = box_condition_exp.get_val();
-                let then_val = box_then_exp.get_val();
-                let else_val = box_else_exp.get_val();
+                let cond_val = box_condition_exp.get_val(&env);
+                let then_val = box_then_exp.get_val(&env);
+                let else_val = box_else_exp.get_val(&env);
                 /*
                 println!("cond_val:  {:?}", cond_val);
                 println!("then_val:  {:?}", then_val);
                 println!("else_val:  {:?}", else_val);
                 */
-                match cond_val {
+                match cond_val.clone() {
                     Value::Bool(b) => match b.as_ref() {
                         "true" => match then_val {
                             Value::Int(_) => RuleNode::EIfT(EIfTNode {
@@ -373,12 +399,42 @@ impl Expression {
                         },
                         _ => panic!("expects true or false"),
                     },
-                    _ => RuleNode::EIfInt(EIfIntNode {
+                    Value::Int(_) => RuleNode::EIfInt(EIfIntNode {
                         env,
                         condition_exp: *box_condition_exp,
                         then_exp: *box_then_exp,
                         else_exp: *box_else_exp,
                     }),
+                    Value::Val(_) => match cond_val.get_val(&env) {
+                        Value::Bool(val) => match val.as_ref() {
+                            "true" => match then_val {
+                                Value::Int(_) => RuleNode::EIfT(EIfTNode {
+                                    env,
+                                    condition_exp: *box_condition_exp,
+                                    then_exp: *box_then_exp,
+                                    else_exp: *box_else_exp,
+                                }),
+                                _ => RuleNode::EIfTError(EIfTErrorNode {
+                                    env,
+                                    condition_exp: *box_condition_exp,
+                                    then_exp: *box_then_exp,
+                                    else_exp: *box_else_exp,
+                                }),
+                            },
+                            "false" => match else_val {
+                                Value::Int(_) => RuleNode::EIfF(EIfFNode {
+                                    env,
+                                    condition_exp: *box_condition_exp,
+                                    then_exp: *box_then_exp,
+                                    else_exp: *box_else_exp,
+                                }),
+                                _ => panic!("todo"),
+                            },
+                            _ => panic!("expects true or false"),
+                        },
+                        _ => panic!("expects boolean value"),
+                    },
+                    _ => panic!("todo"),
                 }
             }
         }
@@ -395,6 +451,7 @@ impl Expression {
 
 #[derive(Debug, Clone)]
 pub struct EIntNode {
+    env: Environment,
     i: i32,
 }
 impl EIntNode {
@@ -402,8 +459,9 @@ impl EIntNode {
         let nl = if with_newline { "\n" } else { "" };
         write!(
             w,
-            "{}{} evalto {} by E-Int {{}}{}",
+            "{}{} |- {} evalto {} by E-Int {{}}{}",
             get_depth_space(depth),
+            self.env.to_string(),
             self.i,
             self.i,
             nl
@@ -439,10 +497,11 @@ impl EVar1Node {
         let nl = if with_newline { "\n" } else { "" };
         write!(
             w,
-            "{}{} |- evalto {} by E-Var2 {{}}{}",
+            "{}{} |- {} evalto {} by E-Var1 {{}}{}",
             get_depth_space(depth),
             self.env.clone().to_string(),
-            self.val.get_val(self.env).to_string(),
+            self.val.clone().to_string(),
+            self.val.get_val(&self.env).to_string(),
             nl
         )
     }
@@ -454,23 +513,24 @@ pub struct EVar2Node {
     val: Value,
 }
 impl EVar2Node {
-    fn show<W: Write>(mut self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+    fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         let _ = write!(
             w,
             "{}{} |- {} evalto {} by E-Var2 {{\n",
             get_depth_space(depth),
             self.env.clone().to_string(),
             self.val.clone().to_string(),
-            self.val.clone().get_val(self.env.clone()).to_string(),
+            self.val.clone().get_val(&self.env).to_string(),
         );
-        self.env.y = None;
+        let mut nenv = self.env.clone();
+        nenv.y = None;
         let _ = write!(
             w,
             "{}{} |- {} evalto {} by E-Var1 {{}}\n",
             get_depth_space(depth + 2),
-            self.env.clone().to_string(),
+            nenv.clone().to_string(),
             self.val.clone().to_string(),
-            self.val.get_val(self.env).to_string(),
+            self.val.get_val(&self.env).to_string(),
         );
         let nl = if with_newline { "\n" } else { "" };
         write!(w, "{}}}{}", get_depth_space(depth), nl)
@@ -532,10 +592,11 @@ impl EIfTNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
         let _ = write!(
             w,
-            "{}{} evalto {} by E-IfT {{\n",
+            "{}{} |- {} evalto {} by E-IfT {{\n",
+            self.env.clone().to_string(),
             get_depth_space(depth),
             self.condition_exp.clone().to_string(),
-            self.then_exp.get_val().to_string(),
+            self.then_exp.get_val(&self.env).to_string(),
         );
         let condition_premise = self.condition_exp.get_rule(self.env.clone());
         let then_premise = self.then_exp.get_rule(self.env);
@@ -586,7 +647,7 @@ impl EIfFNode {
             "{}{} evalto {} by E-IfF {{\n",
             get_depth_space(depth),
             self.condition_exp.clone().to_string(),
-            self.else_exp.get_val().to_string(),
+            self.else_exp.get_val(&self.env).to_string(),
         );
         let condition_premise = self.condition_exp.get_rule(self.env.clone());
         let else_premise = self.else_exp.get_rule(self.env);
@@ -606,12 +667,13 @@ pub struct EPlusNode {
 }
 impl EPlusNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let i1 = self.e1.get_val().get_num();
-        let i2 = self.e2.get_val().get_num();
+        let i1 = self.e1.get_val(&self.env).get_num();
+        let i2 = self.e2.get_val(&self.env).get_num();
         let _ = write!(
             w,
-            "{}{} + {} evalto {} by E-Plus {{\n",
+            "{}{} |- {} + {} evalto {} by E-Plus {{\n",
             get_depth_space(depth),
+            self.env.clone().to_string(),
             self.e1.clone().to_string(),
             self.e2.clone().to_string(),
             i1 + i2
@@ -683,8 +745,8 @@ pub struct ETimesNode {
 }
 impl ETimesNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let i1 = self.e1.get_val().get_num();
-        let i2 = self.e2.get_val().get_num();
+        let i1 = self.e1.get_val(&self.env).get_num();
+        let i2 = self.e2.get_val(&self.env).get_num();
         let _ = write!(
             w,
             "{}{} * {} evalto {} by E-Times {{\n",
@@ -716,8 +778,8 @@ pub struct ELtNode {
 }
 impl ELtNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let i1 = self.e1.get_val();
-        let i2 = self.e2.get_val();
+        let i1 = self.e1.get_val(&self.env);
+        let i2 = self.e2.get_val(&self.env);
 
         let b = match i1.comp(&i2) {
             Value::Bool(val) => val,
@@ -778,8 +840,8 @@ pub struct EMinusNode {
 }
 impl EMinusNode {
     fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let i1 = self.e1.get_val().get_num();
-        let i2 = self.e2.get_val().get_num();
+        let i1 = self.e1.get_val(&self.env).get_num();
+        let i2 = self.e2.get_val(&self.env).get_num();
         let _ = write!(
             w,
             "{}{} - {} evalto {} by E-Minus {{\n",
