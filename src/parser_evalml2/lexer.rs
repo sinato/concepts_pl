@@ -6,7 +6,7 @@ pub enum Token {
     Op(String),
     Bool(String),
     Eval(String),
-    Val(String),
+    Var(String),
     ENV,
     ERR,
     COMMA,
@@ -43,10 +43,10 @@ impl Tokens {
             _ => panic!(""),
         }
     }
-    pub fn consume_val(&mut self) -> String {
+    pub fn consume_var(&mut self) -> String {
         let token = self.pop().expect("");
         match token {
-            Token::Val(val) => val,
+            Token::Var(val) => val,
             _ => panic!(""),
         }
     }
@@ -91,7 +91,7 @@ impl Lexer {
             ("ELSE", r"else"),
             ("LET", r"let"),
             ("IN", r"in"),
-            ("VAL", r"(x|y)"),
+            ("VAR", r"(x|y)"),
             ("EVAL", r"evalto"),
         ];
         let re = make_regex(&token_patterns);
@@ -121,7 +121,7 @@ impl Lexer {
                 "BOOL" => tokens.push(Token::Bool(val)),
                 "ERR" => tokens.push(Token::ERR),
                 "ENV" => tokens.push(Token::ENV),
-                "VAL" => tokens.push(Token::Val(val)),
+                "VAR" => tokens.push(Token::Var(val)),
                 "OP" => tokens.push(Token::Op(val)),
                 "EVAL" => tokens.push(Token::Eval(val)),
                 "PS" => tokens.push(Token::PS),
