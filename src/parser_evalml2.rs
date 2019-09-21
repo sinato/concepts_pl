@@ -3,6 +3,7 @@ mod expression;
 mod lexer;
 mod nodes;
 mod terms;
+mod value;
 
 use environment::Environment;
 use expression::Expression;

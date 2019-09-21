@@ -1,3 +1,5 @@
+use super::value::Value;
+
 use regex::Regex;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -35,6 +37,16 @@ impl Tokens {
     pub fn peek(&self) -> Option<Token> {
         let mut tokens = self.clone();
         tokens.pop()
+    }
+    pub fn consume_val(&mut self) -> Value {
+        match self.peek() {
+            Some(token) => match token {
+                Token::Int(_) => Value::Num(self.consume_num()),
+                Token::Bool(_) => Value::Bool(self.consume_bool()),
+                _ => panic!("unexpected"),
+            },
+            None => panic!("unexpected"),
+        }
     }
     pub fn consume_num(&mut self) -> i32 {
         let token = self.pop().expect("");

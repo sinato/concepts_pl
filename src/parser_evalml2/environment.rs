@@ -1,20 +1,20 @@
 use super::lexer::{Token, Tokens};
+use super::value::Value;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    pub x: Option<i32>,
-    pub y: Option<i32>,
+    pub x: Option<Value>,
+    pub y: Option<Value>,
 }
 impl Environment {
     pub fn new(tokens: &mut Tokens) -> Environment {
         let mut environment = Environment { x: None, y: None };
-
         match tokens.peek() {
             Some(token) => match token {
                 Token::XEQ => {
                     tokens.pop(); // consume x =
-                    let num: i32 = tokens.consume_num();
-                    environment.x = Some(num);
+                    let val = tokens.consume_val();
+                    environment.x = Some(val);
                 }
                 _ => panic!("unexpected"),
             },
@@ -25,8 +25,8 @@ impl Environment {
             Some(token) => match token {
                 Token::YEQ => {
                     tokens.pop(); // consume y =
-                    let num: i32 = tokens.consume_num();
-                    environment.y = Some(num);
+                    let val = tokens.consume_val();
+                    environment.y = Some(val);
                 }
                 _ => panic!("unexpected"),
             },
@@ -47,7 +47,7 @@ impl Environment {
         num
     }
 
-    pub fn get_val(&self, identifier: String) -> i32 {
+    pub fn get_val(self, identifier: String) -> Value {
         match identifier.as_ref() {
             "x" => self.x.expect("expects Some(x)"),
             "y" => self.y.expect("expects Some(y)"),
@@ -55,7 +55,7 @@ impl Environment {
         }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string(self) -> String {
         if self.get_num() == 0 {
             String::from("|- ")
         } else {
