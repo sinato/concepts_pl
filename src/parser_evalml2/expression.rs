@@ -6,6 +6,44 @@ use super::value::Value;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
+pub struct LetExpression {
+    pub identifier: String,
+    pub expression: Expression,
+}
+impl LetExpression {
+    pub fn new(tokens: &mut Tokens) -> LetExpression {
+        match tokens.peek().expect("") {
+            Token::XEQ => {
+                tokens.pop(); // consume x =
+                let expression = Expression::new(tokens);
+                LetExpression {
+                    identifier: String::from("x"),
+                    expression,
+                }
+            }
+            Token::YEQ => {
+                tokens.pop(); // consume y =
+                let expression = Expression::new(tokens);
+                LetExpression {
+                    identifier: String::from("y"),
+                    expression,
+                }
+            }
+            _ => panic!("todo"),
+        }
+    }
+}
+impl LetExpression {
+    pub fn to_string(self) -> String {
+        let mut s = "".to_string();
+        s += &self.identifier;
+        s += " = ";
+        s += &self.expression.to_string();
+        s
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Expression {
     pub terms: Vec<(String, Term)>,
 }
@@ -50,6 +88,7 @@ impl Expression {
             let latter_val = latter.get_val(environment);
             match operator.as_ref() {
                 "+" => former_val + latter_val,
+                "*" => former_val * latter_val,
                 _ => panic!(""),
             }
         }
@@ -76,6 +115,14 @@ impl Expression {
                         if_term.condition_expression.to_string(),
                         if_term.then_expression.to_string(),
                         if_term.else_expression.to_string()
+                    )
+                }
+                Term::Let(let_term) => {
+                    s = add_op(operator, s);
+                    s += &format!(
+                        "let {} in {}",
+                        let_term.let_expression.to_string(),
+                        let_term.in_expression.to_string()
                     )
                 }
             }

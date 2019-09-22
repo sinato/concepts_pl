@@ -1,6 +1,6 @@
 use super::environment::Environment;
 use super::expression::Expression;
-use super::nodes::enodes::{EBNode, EIfNode, EValNode, EVarNode};
+use super::nodes::enodes::{EBNode, EIfNode, ELetNode, EValNode, EVarNode};
 use super::terms::Term;
 use std::io::{self, Write};
 
@@ -12,6 +12,7 @@ pub enum RuleNode {
     EVar(EVarNode),
     EVal(EValNode),
     EIf(EIfNode),
+    ELet(ELetNode),
     EBNode(EBNode),
 }
 
@@ -35,6 +36,11 @@ impl RuleNode {
                     environment,
                     expression: original_expression,
                 }),
+                Term::Let(let_node) => RuleNode::ELet(ELetNode {
+                    environment,
+                    expression: original_expression,
+                    term: let_node,
+                }),
                 _ => panic!("todo"),
             }
         } else {
@@ -49,6 +55,7 @@ impl RuleNode {
             RuleNode::EVar(node) => node.show(w, depth, with_newline),
             RuleNode::EVal(node) => node.show(w, depth, with_newline),
             RuleNode::EIf(node) => node.show(w, depth, with_newline),
+            RuleNode::ELet(node) => node.show(w, depth, with_newline),
             RuleNode::EBNode(node) => node.show(w, depth, with_newline),
         }
     }

@@ -15,19 +15,21 @@ impl Environment {
                     tokens.pop(); // consume x =
                     let val = tokens.consume_val();
                     environment.x = Some(val);
+                    tokens.pop(); // consume ,
+                    match tokens.peek() {
+                        Some(token) => match token {
+                            Token::YEQ => {
+                                tokens.pop(); // consume y =
+                                let val = tokens.consume_val();
+                                environment.y = Some(val);
+                            }
+                            Token::ENV => (),
+                            _ => panic!("unexpected"),
+                        },
+                        None => panic!("unexpected"),
+                    }
                 }
-                _ => panic!("unexpected"),
-            },
-            None => panic!("unexpected"),
-        }
-        tokens.pop(); // consume ,
-        match tokens.peek() {
-            Some(token) => match token {
-                Token::YEQ => {
-                    tokens.pop(); // consume y =
-                    let val = tokens.consume_val();
-                    environment.y = Some(val);
-                }
+                Token::ENV => (),
                 _ => panic!("unexpected"),
             },
             None => panic!("unexpected"),

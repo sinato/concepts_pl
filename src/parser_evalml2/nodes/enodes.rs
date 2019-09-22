@@ -1,9 +1,9 @@
 use super::super::environment::Environment;
 use super::super::expression::Expression;
 use super::super::nodes::{get_depth_space, RuleNode};
-use super::super::terms::{IfTerm, Term};
+use super::super::terms::{IfTerm, LetTerm, Term};
 use super::super::value::Value;
-use super::bnodes::BPlusNode;
+use super::bnodes::BOpNode;
 
 use std::io::{self, Write};
 
@@ -146,7 +146,40 @@ impl EBNode {
                 let _ = premise2.show(w, depth + 2, false);
                 let _ = write!(w, ";\n");
 
-                let premise = BPlusNode { i1, i2 };
+                let premise = BOpNode {
+                    i1,
+                    i2,
+                    op: String::from("+"),
+                };
+                let _ = premise.show(w, depth + 2, true);
+
+                let nl = if with_newline { "\n" } else { "" };
+                write!(w, "{}}}{}", get_depth_space(depth), nl)
+            }
+            "*" => {
+                let i1 = former_val.get_num();
+                let i2 = latter_val.get_num();
+                let _ = write!(
+                    w,
+                    "{}{}{} * {} evalto {} by E-Times {{\n",
+                    get_depth_space(depth),
+                    self.environment.clone().to_string(),
+                    former.clone().to_string(),
+                    latter.clone().to_string(),
+                    i1 * i2
+                );
+                let premise1 = RuleNode::new(self.environment.clone(), former);
+                let premise2 = RuleNode::new(self.environment, latter);
+                let _ = premise1.show(w, depth + 2, false);
+                let _ = write!(w, ";\n");
+                let _ = premise2.show(w, depth + 2, false);
+                let _ = write!(w, ";\n");
+
+                let premise = BOpNode {
+                    i1,
+                    i2,
+                    op: String::from("*"),
+                };
                 let _ = premise.show(w, depth + 2, true);
 
                 let nl = if with_newline { "\n" } else { "" };
@@ -184,5 +217,63 @@ impl EValNode {
             ),
             _ => panic!("unexpected"),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ELetNode {
+    pub environment: Environment,
+    pub expression: Expression,
+    pub term: LetTerm,
+}
+impl ELetNode {
+    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+        let in_expression = self.term.clone().in_expression;
+        let let_expression = self.term.clone().let_expression;
+
+        let mut new_env = self.environment.clone();
+        match let_expression.identifier.as_ref() {
+            "x" => {
+                new_env.x = Some(
+                    let_expression
+                        .clone()
+                        .expression
+                        .get_val(self.clone().environment),
+                )
+            }
+            "y" => {
+                new_env.y = Some(
+                    let_expression
+                        .clone()
+                        .expression
+                        .get_val(self.clone().environment),
+                )
+            }
+            _ => panic!("unexpected identifier"),
+        }
+
+        println!("****************");
+        println!("{:?}", self.expression);
+        println!("****************");
+
+        let _ = write!(
+            w,
+            "{}{}{} evalto {} by E-Let {{\n",
+            get_depth_space(depth),
+            self.environment.clone().to_string(),
+            self.expression.clone().to_string(),
+            in_expression.clone().get_val(new_env.clone()).to_string(),
+        );
+
+        let let_premise =
+            RuleNode::new(self.environment.clone(), let_expression.clone().expression);
+        let in_premise = RuleNode::new(new_env, in_expression);
+
+        let _ = let_premise.show(w, depth + 2, false);
+        let _ = write!(w, ";\n");
+
+        let _ = in_premise.show(w, depth + 2, true);
+        let nl = if with_newline { "\n" } else { "" };
+        write!(w, "{}}}{}", get_depth_space(depth), nl)
     }
 }

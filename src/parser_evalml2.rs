@@ -19,7 +19,13 @@ pub fn derive<W: Write>(judgement: &str, w: &mut W) -> io::Result<()> {
 
     let environment = Environment::new(&mut tokens);
     let expression = Expression::new(&mut tokens);
+    println!("++++++++++++++++++++++");
+    println!("expression: {:?}", expression);
+    println!("++++++++++++++++++++++");
     let derivation_tree = RuleNode::new(environment, expression);
+    println!("++++++++++++++++++++++");
+    println!("derivation_tree: {:?}", derivation_tree);
+    println!("++++++++++++++++++++++");
 
     derivation_tree.show(w, 0, true)
 }

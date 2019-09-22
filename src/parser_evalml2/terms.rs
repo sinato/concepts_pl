@@ -1,5 +1,5 @@
 use super::environment::Environment;
-use super::expression::Expression;
+use super::expression::{Expression, LetExpression};
 use super::lexer::{Token, Tokens};
 use super::value::Value;
 
@@ -8,6 +8,7 @@ pub enum Term {
     Val(i32),
     Var(String),
     If(IfTerm),
+    Let(LetTerm),
 }
 impl Term {
     pub fn new(tokens: &mut Tokens) -> Term {
@@ -33,6 +34,16 @@ impl Term {
                     else_expression,
                 })
             }
+            Token::LET => {
+                tokens.pop(); // consume let
+                let let_expression = LetExpression::new(tokens);
+                tokens.pop(); // consume in
+                let in_expression = Expression::new(tokens);
+                Term::Let(LetTerm {
+                    let_expression,
+                    in_expression,
+                })
+            }
             _ => panic!("todo"),
         }
     }
@@ -42,6 +53,7 @@ impl Term {
             Term::Val(num) => Value::Num(num),
             Term::Var(identifier) => environment.get_val(identifier),
             Term::If(if_term) => panic!("todo"),
+            Term::Let(let_term) => panic!("todo"),
         }
     }
 
@@ -50,6 +62,7 @@ impl Term {
             Term::Val(_) => panic!("unexpected"),
             Term::Var(identifier) => identifier,
             Term::If(_) => panic!("unexpected"),
+            Term::Let(_) => panic!("unexpected"),
         }
     }
 }
@@ -59,4 +72,10 @@ pub struct IfTerm {
     pub condition_expression: Expression,
     pub then_expression: Expression,
     pub else_expression: Expression,
+}
+
+#[derive(Debug, Clone)]
+pub struct LetTerm {
+    pub let_expression: LetExpression,
+    pub in_expression: Expression,
 }
