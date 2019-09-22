@@ -1,9 +1,10 @@
 use super::super::environment::Environment;
 use super::super::expression::Expression;
-use super::super::nodes::{get_depth_space, RuleNode};
+use super::super::nodes::RuleNode;
 use super::super::terms::{IfTerm, LetTerm, Term};
 use super::super::value::Value;
 use super::bnodes::BOpNode;
+use super::writer::RuleWriter;
 
 use std::io::{self, Write};
 
@@ -17,43 +18,32 @@ impl EVarNode {
         let mut terms = self.expression.terms.clone();
         let (_, term) = terms.pop().expect("");
         let identifier = term.get_identifier();
-        let rule_str = "E-Var1".to_string();
+        let mut rule_str = "E-Var1".to_string();
 
-        match self.environment.get_num() {
+        let premise = match self.environment.get_num() {
             2 => match identifier.as_ref() {
                 "x" => {
                     let mut new_env = self.environment.clone();
                     new_env.y = None;
-                    let premise = RuleNode::new(new_env, self.expression);
-
-                    writer.show_rule_with_premise(
-                        self.environment.clone(),
-                        identifier.clone(),
-                        self.environment
-                            .get_val(String::from(identifier))
-                            .to_string(),
-                        "E-Var2".to_string(),
-                        premise,
-                    )
+                    rule_str = "E-Var2".to_string();
+                    Some(RuleNode::new(new_env, self.expression))
                 }
-                "y" => writer.show_rule_without_premise(
-                    Some(self.environment.clone()),
-                    identifier.clone(),
-                    self.environment.get_val(identifier).to_string(),
-                    rule_str,
-                    false,
-                ),
+                "y" => None,
                 _ => panic!("unexpected"),
             },
-            1 => writer.show_rule_without_premise(
-                Some(self.environment.clone()),
-                identifier.clone(),
-                self.environment.get_val(identifier).to_string(),
-                rule_str,
-                false,
-            ),
+            1 => None,
             _ => panic!("unexpected"),
-        }
+        };
+        writer.show_rule(
+            Some(self.environment.clone()),
+            identifier.clone(),
+            self.environment.get_val(identifier).to_string(),
+            rule_str,
+            false,
+            premise,
+            None,
+            None,
+        )
     }
 }
 
@@ -80,13 +70,15 @@ impl EIfNode {
         if flag == String::from("true") {
             let condition_premise = RuleNode::new(self.environment.clone(), condition_expression);
             let then_premise = RuleNode::new(self.environment.clone(), then_expression.clone());
-            writer.show_rule_with_premise2(
-                self.environment.clone(),
+            writer.show_rule(
+                Some(self.environment.clone()),
                 self.expression.clone().to_string(),
                 then_expression.get_val(self.environment).to_string(),
                 "E-IfT".to_string(),
-                condition_premise,
-                then_premise,
+                false,
+                Some(condition_premise),
+                Some(then_premise),
+                None,
             )
         } else {
             panic!("todo")
@@ -119,14 +111,15 @@ impl EBNode {
             "*" => ((i1 * i2).to_string(), "E-Times".to_string()),
             _ => panic!("todo"),
         };
-        writer.show_rule_with_premise3(
-            self.environment,
+        writer.show_rule(
+            Some(self.environment),
             self.expression.to_string(),
             val_str,
             rule_str,
-            premise1,
-            premise2,
-            premise,
+            false,
+            Some(premise1),
+            Some(premise2),
+            Some(premise),
         )
     }
 }
@@ -140,17 +133,19 @@ impl EValNode {
     pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         let mut terms = self.expression.clone().terms;
         let (_, term) = terms.pop().expect("");
-        let rule_str = "E-Int".to_string();
         match term {
-            Term::Val(_) => writer.show_rule_without_premise(
+            Term::Val(_) => writer.show_rule(
                 Some(self.environment.clone()),
                 self.expression.clone().to_string(),
                 self.expression
                     .get_val(self.environment)
                     .get_num()
                     .to_string(),
-                rule_str,
+                "E-Int".to_string(),
                 false,
+                None,
+                None,
+                None,
             ),
             _ => panic!("unexpected"),
         }
@@ -169,162 +164,28 @@ impl ELetNode {
         let let_expression = self.term.clone().let_expression;
 
         let mut new_env = self.environment.clone();
+        let val = Some(
+            let_expression
+                .expression
+                .clone()
+                .get_val(self.environment.clone()),
+        );
         match let_expression.identifier.as_ref() {
-            "x" => {
-                new_env.x = Some(
-                    let_expression
-                        .clone()
-                        .expression
-                        .get_val(self.clone().environment),
-                )
-            }
-            "y" => {
-                new_env.y = Some(
-                    let_expression
-                        .clone()
-                        .expression
-                        .get_val(self.clone().environment),
-                )
-            }
+            "x" => new_env.x = val,
+            "y" => new_env.y = val,
             _ => panic!("unexpected identifier"),
         }
-        let let_premise =
-            RuleNode::new(self.environment.clone(), let_expression.clone().expression);
+        let let_premise = RuleNode::new(self.environment.clone(), let_expression.expression);
         let in_premise = RuleNode::new(new_env.clone(), in_expression.clone());
-        writer.show_rule_with_premise2(
-            self.environment.clone(),
+        writer.show_rule(
+            Some(self.environment.clone()),
             self.expression.clone().to_string(),
             in_expression.get_val(new_env).to_string(),
             "E-Let".to_string(),
-            let_premise,
-            in_premise,
+            false,
+            Some(let_premise),
+            Some(in_premise),
+            None,
         )
-    }
-}
-
-pub struct RuleWriter<W> {
-    w: W,
-    depth: usize,
-}
-impl<W: Write> RuleWriter<W> {
-    pub fn new(w: W, depth: usize) -> RuleWriter<W> {
-        RuleWriter { w, depth }
-    }
-
-    pub fn write_nl(&mut self) {
-        let _ = write!(self.w, "\n");
-    }
-
-    fn inc_depth(&mut self) {
-        self.depth += 2;
-    }
-    fn dec_depth(&mut self) {
-        self.depth -= 2;
-    }
-
-    pub fn show_rule_without_premise(
-        &mut self,
-        environment: Option<Environment>,
-        expression_str: String,
-        evalto_str: String,
-        rule_str: String,
-        is_bnode: bool,
-    ) -> io::Result<()> {
-        let environment_str = match environment.clone() {
-            Some(env) => env.to_string(),
-            None => "".to_string(),
-        };
-        let eq_str = if is_bnode { "is" } else { "evalto" };
-        write!(
-            self.w,
-            "{}{}{} {} {} by {} {{}}",
-            get_depth_space(self.depth),
-            environment_str,
-            expression_str,
-            eq_str.to_string(),
-            evalto_str,
-            rule_str,
-        )
-    }
-
-    pub fn show_rule_with_premise(
-        &mut self,
-        environment: Environment,
-        expression_str: String,
-        evalto_str: String,
-        rule_str: String,
-        premise: RuleNode,
-    ) -> io::Result<()> {
-        let _ = write!(
-            self.w,
-            "{}{}{} evalto {} by {} {{\n",
-            get_depth_space(self.depth),
-            environment.clone().to_string(),
-            expression_str,
-            evalto_str,
-            rule_str,
-        );
-        self.inc_depth();
-        let _ = premise.show(self);
-        let _ = write!(self.w, "\n");
-        self.dec_depth();
-        write!(self.w, "{}}}", get_depth_space(self.depth))
-    }
-
-    pub fn show_rule_with_premise2(
-        &mut self,
-        environment: Environment,
-        expression_str: String,
-        evalto_str: String,
-        rule_str: String,
-        premise1: RuleNode,
-        premise2: RuleNode,
-    ) -> io::Result<()> {
-        let _ = write!(
-            self.w,
-            "{}{}{} evalto {} by {} {{\n",
-            get_depth_space(self.depth),
-            environment.clone().to_string(),
-            expression_str,
-            evalto_str,
-            rule_str,
-        );
-        self.inc_depth();
-        let _ = premise1.show(self);
-        let _ = write!(self.w, ";\n");
-        let _ = premise2.show(self);
-        let _ = write!(self.w, "\n");
-        self.dec_depth();
-        write!(self.w, "{}}}", get_depth_space(self.depth))
-    }
-
-    pub fn show_rule_with_premise3(
-        &mut self,
-        environment: Environment,
-        expression_str: String,
-        evalto_str: String,
-        rule_str: String,
-        premise1: RuleNode,
-        premise2: RuleNode,
-        premise: BOpNode,
-    ) -> io::Result<()> {
-        let _ = write!(
-            self.w,
-            "{}{}{} evalto {} by {} {{\n",
-            get_depth_space(self.depth),
-            environment.clone().to_string(),
-            expression_str,
-            evalto_str,
-            rule_str,
-        );
-        self.inc_depth();
-        let _ = premise1.show(self);
-        let _ = write!(self.w, ";\n");
-        let _ = premise2.show(self);
-        let _ = write!(self.w, ";\n");
-        let _ = premise.show(self);
-        let _ = write!(self.w, "\n");
-        self.dec_depth();
-        write!(self.w, "{}}}", get_depth_space(self.depth))
     }
 }

@@ -8,7 +8,7 @@ mod value;
 use environment::Environment;
 use expression::Expression;
 use lexer::Lexer;
-use nodes::enodes::RuleWriter;
+use nodes::writer::RuleWriter;
 use nodes::RuleNode;
 
 use std::io::{self, Write};

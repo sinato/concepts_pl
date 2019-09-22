@@ -1,11 +1,13 @@
 use super::environment::Environment;
 use super::expression::Expression;
-use super::nodes::enodes::{EBNode, EIfNode, ELetNode, EValNode, EVarNode, RuleWriter};
+use super::nodes::enodes::{EBNode, EIfNode, ELetNode, EValNode, EVarNode};
+use super::nodes::writer::RuleWriter;
 use super::terms::Term;
 use std::io::{self, Write};
 
 pub mod bnodes;
 pub mod enodes;
+pub mod writer;
 
 #[derive(Debug, Clone)]
 pub enum RuleNode {
