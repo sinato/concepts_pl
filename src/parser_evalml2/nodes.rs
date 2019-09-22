@@ -1,6 +1,6 @@
 use super::environment::Environment;
 use super::expression::Expression;
-use super::nodes::enodes::{EBNode, EIfNode, ELetNode, EValNode, EVarNode};
+use super::nodes::enodes::{EBNode, EIfNode, ELetNode, EValNode, EVarNode, RuleWriter};
 use super::terms::Term;
 use std::io::{self, Write};
 
@@ -41,7 +41,6 @@ impl RuleNode {
                     expression: original_expression,
                     term: let_node,
                 }),
-                _ => panic!("todo"),
             }
         } else {
             RuleNode::EBNode(EBNode {
@@ -50,13 +49,13 @@ impl RuleNode {
             })
         }
     }
-    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         match self {
-            RuleNode::EVar(node) => node.show(w, depth, with_newline),
-            RuleNode::EVal(node) => node.show(w, depth, with_newline),
-            RuleNode::EIf(node) => node.show(w, depth, with_newline),
-            RuleNode::ELet(node) => node.show(w, depth, with_newline),
-            RuleNode::EBNode(node) => node.show(w, depth, with_newline),
+            RuleNode::EVar(node) => node.show(writer),
+            RuleNode::EVal(node) => node.show(writer),
+            RuleNode::EIf(node) => node.show(writer),
+            RuleNode::ELet(node) => node.show(writer),
+            RuleNode::EBNode(node) => node.show(writer),
         }
     }
 }

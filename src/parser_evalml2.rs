@@ -8,11 +8,12 @@ mod value;
 use environment::Environment;
 use expression::Expression;
 use lexer::Lexer;
+use nodes::enodes::RuleWriter;
 use nodes::RuleNode;
 
 use std::io::{self, Write};
 
-pub fn derive<W: Write>(judgement: &str, w: &mut W) -> io::Result<()> {
+pub fn derive<W: Write>(judgement: &str, w: &mut W) {
     let lexer = Lexer::new();
     let mut tokens = lexer.lex(judgement.to_string());
     dbg!(&tokens);
@@ -26,6 +27,7 @@ pub fn derive<W: Write>(judgement: &str, w: &mut W) -> io::Result<()> {
     println!("++++++++++++++++++++++");
     println!("derivation_tree: {:?}", derivation_tree);
     println!("++++++++++++++++++++++");
-
-    derivation_tree.show(w, 0, true)
+    let mut writer = RuleWriter::new(w, 0);
+    let _ = derivation_tree.show(&mut writer);
+    writer.write_nl();
 }

@@ -13,55 +13,44 @@ pub struct EVarNode {
     pub expression: Expression,
 }
 impl EVarNode {
-    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let nl = if with_newline { "\n" } else { "" };
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
+        let mut terms = self.expression.terms.clone();
+        let (_, term) = terms.pop().expect("");
+        let identifier = term.get_identifier();
+        let rule_str = "E-Var1".to_string();
+
         match self.environment.get_num() {
-            2 => {
-                let mut terms = self.expression.terms.clone();
-                let (_, term) = terms.pop().expect("");
-                let identifier = term.get_identifier();
-                match identifier.as_ref() {
-                    "x" => {
-                        let _ = write!(
-                            w,
-                            "{}{}x evalto {} by E-Var2 {{\n",
-                            get_depth_space(depth),
-                            self.environment.clone().to_string(),
-                            self.environment
-                                .clone()
-                                .get_val(String::from("x"))
-                                .to_string(),
-                        );
-                        let mut new_env = self.environment.clone();
-                        new_env.y = None;
-                        let premise = RuleNode::new(new_env, self.expression);
-                        let _ = premise.show(w, depth + 2, true);
-                        let nl = if with_newline { "\n" } else { "" };
-                        write!(w, "{}}}{}", get_depth_space(depth), nl)
-                    }
-                    "y" => write!(
-                        w,
-                        "{}{}{} evalto {} by E-Var1 {{}}{}",
-                        get_depth_space(depth),
-                        self.environment.clone().to_string(),
+            2 => match identifier.as_ref() {
+                "x" => {
+                    let mut new_env = self.environment.clone();
+                    new_env.y = None;
+                    let premise = RuleNode::new(new_env, self.expression);
+
+                    writer.show_rule_with_premise(
+                        self.environment.clone(),
                         identifier.clone(),
-                        self.environment.clone().get_val(identifier).to_string(),
-                        nl
-                    ),
-                    _ => panic!("unexpected"),
+                        self.environment
+                            .get_val(String::from(identifier))
+                            .to_string(),
+                        "E-Var2".to_string(),
+                        premise,
+                    )
                 }
-            }
-            1 => write!(
-                w,
-                "{}{}{} evalto {} by E-Var1 {{}}{}",
-                get_depth_space(depth),
-                self.environment.clone().to_string(),
-                "x",
-                self.environment
-                    .clone()
-                    .get_val(String::from("x"))
-                    .to_string(),
-                nl
+                "y" => writer.show_rule_without_premise(
+                    Some(self.environment.clone()),
+                    identifier.clone(),
+                    self.environment.get_val(identifier).to_string(),
+                    rule_str,
+                    false,
+                ),
+                _ => panic!("unexpected"),
+            },
+            1 => writer.show_rule_without_premise(
+                Some(self.environment.clone()),
+                identifier.clone(),
+                self.environment.get_val(identifier).to_string(),
+                rule_str,
+                false,
             ),
             _ => panic!("unexpected"),
         }
@@ -75,10 +64,10 @@ pub struct EIfNode {
     pub term: IfTerm,
 }
 impl EIfNode {
-    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         let condition_expression = self.term.condition_expression;
         let then_expression = self.term.then_expression;
-        let else_expression = self.term.else_expression;
+        let _else_expression = self.term.else_expression;
 
         let flag: String = match condition_expression
             .clone()
@@ -89,25 +78,16 @@ impl EIfNode {
         };
 
         if flag == String::from("true") {
-            let _ = write!(
-                w,
-                "{}{}{} evalto {} by E-IfT {{\n",
-                get_depth_space(depth),
-                self.environment.clone().to_string(),
-                self.expression.clone().to_string(),
-                then_expression
-                    .clone()
-                    .get_val(self.environment.clone())
-                    .to_string(),
-            );
             let condition_premise = RuleNode::new(self.environment.clone(), condition_expression);
-            let then_premise = RuleNode::new(self.environment, then_expression);
-
-            let _ = condition_premise.show(w, depth + 2, false);
-            let _ = write!(w, ";\n");
-            let _ = then_premise.show(w, depth + 2, true);
-            let nl = if with_newline { "\n" } else { "" };
-            write!(w, "{}}}{}", get_depth_space(depth), nl)
+            let then_premise = RuleNode::new(self.environment.clone(), then_expression.clone());
+            writer.show_rule_with_premise2(
+                self.environment.clone(),
+                self.expression.clone().to_string(),
+                then_expression.get_val(self.environment).to_string(),
+                "E-IfT".to_string(),
+                condition_premise,
+                then_premise,
+            )
         } else {
             panic!("todo")
         }
@@ -120,73 +100,34 @@ pub struct EBNode {
     pub expression: Expression,
 }
 impl EBNode {
-    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         let (split_position, operator) = self.expression.get_split_position();
         let (former, latter) = self.expression.get_splitted_expression(split_position);
-        let former_val = former.clone().get_val(self.environment.clone());
-        let latter_val = latter.clone().get_val(self.environment.clone());
 
-        match operator.as_ref() {
-            "+" => {
-                let i1 = former_val.get_num();
-                let i2 = latter_val.get_num();
-                let _ = write!(
-                    w,
-                    "{}{}{} + {} evalto {} by E-Plus {{\n",
-                    get_depth_space(depth),
-                    self.environment.clone().to_string(),
-                    former.clone().to_string(),
-                    latter.clone().to_string(),
-                    i1 + i2
-                );
-                let premise1 = RuleNode::new(self.environment.clone(), former);
-                let premise2 = RuleNode::new(self.environment, latter);
-                let _ = premise1.show(w, depth + 2, false);
-                let _ = write!(w, ";\n");
-                let _ = premise2.show(w, depth + 2, false);
-                let _ = write!(w, ";\n");
+        let i1 = former.clone().get_val(self.environment.clone()).get_num();
+        let i2 = latter.clone().get_val(self.environment.clone()).get_num();
+        let premise1 = RuleNode::new(self.environment.clone(), former);
+        let premise2 = RuleNode::new(self.environment.clone(), latter);
 
-                let premise = BOpNode {
-                    i1,
-                    i2,
-                    op: String::from("+"),
-                };
-                let _ = premise.show(w, depth + 2, true);
-
-                let nl = if with_newline { "\n" } else { "" };
-                write!(w, "{}}}{}", get_depth_space(depth), nl)
-            }
-            "*" => {
-                let i1 = former_val.get_num();
-                let i2 = latter_val.get_num();
-                let _ = write!(
-                    w,
-                    "{}{}{} * {} evalto {} by E-Times {{\n",
-                    get_depth_space(depth),
-                    self.environment.clone().to_string(),
-                    former.clone().to_string(),
-                    latter.clone().to_string(),
-                    i1 * i2
-                );
-                let premise1 = RuleNode::new(self.environment.clone(), former);
-                let premise2 = RuleNode::new(self.environment, latter);
-                let _ = premise1.show(w, depth + 2, false);
-                let _ = write!(w, ";\n");
-                let _ = premise2.show(w, depth + 2, false);
-                let _ = write!(w, ";\n");
-
-                let premise = BOpNode {
-                    i1,
-                    i2,
-                    op: String::from("*"),
-                };
-                let _ = premise.show(w, depth + 2, true);
-
-                let nl = if with_newline { "\n" } else { "" };
-                write!(w, "{}}}{}", get_depth_space(depth), nl)
-            }
-            _ => panic!(""),
-        }
+        let premise = BOpNode {
+            i1,
+            i2,
+            op: operator.clone(),
+        };
+        let (val_str, rule_str) = match operator.as_ref() {
+            "+" => ((i1 + i2).to_string(), "E-Plus".to_string()),
+            "*" => ((i1 * i2).to_string(), "E-Times".to_string()),
+            _ => panic!("todo"),
+        };
+        writer.show_rule_with_premise3(
+            self.environment,
+            self.expression.to_string(),
+            val_str,
+            rule_str,
+            premise1,
+            premise2,
+            premise,
+        )
     }
 }
 
@@ -196,24 +137,20 @@ pub struct EValNode {
     pub expression: Expression,
 }
 impl EValNode {
-    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
-        let nl = if with_newline { "\n" } else { "" };
-        let i = self
-            .expression
-            .clone()
-            .get_val(self.environment.clone())
-            .get_num();
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         let mut terms = self.expression.clone().terms;
-        let (operator, term) = terms.pop().expect("");
+        let (_, term) = terms.pop().expect("");
+        let rule_str = "E-Int".to_string();
         match term {
-            Term::Val(num) => write!(
-                w,
-                "{}{}{} evalto {} by E-Int {{}}{}",
-                get_depth_space(depth),
-                self.environment.clone().to_string(),
-                self.expression.to_string(),
-                i,
-                nl
+            Term::Val(_) => writer.show_rule_without_premise(
+                Some(self.environment.clone()),
+                self.expression.clone().to_string(),
+                self.expression
+                    .get_val(self.environment)
+                    .get_num()
+                    .to_string(),
+                rule_str,
+                false,
             ),
             _ => panic!("unexpected"),
         }
@@ -227,7 +164,7 @@ pub struct ELetNode {
     pub term: LetTerm,
 }
 impl ELetNode {
-    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         let in_expression = self.term.clone().in_expression;
         let let_expression = self.term.clone().let_expression;
 
@@ -251,29 +188,143 @@ impl ELetNode {
             }
             _ => panic!("unexpected identifier"),
         }
-
-        println!("****************");
-        println!("{:?}", self.expression);
-        println!("****************");
-
-        let _ = write!(
-            w,
-            "{}{}{} evalto {} by E-Let {{\n",
-            get_depth_space(depth),
-            self.environment.clone().to_string(),
-            self.expression.clone().to_string(),
-            in_expression.clone().get_val(new_env.clone()).to_string(),
-        );
-
         let let_premise =
             RuleNode::new(self.environment.clone(), let_expression.clone().expression);
-        let in_premise = RuleNode::new(new_env, in_expression);
+        let in_premise = RuleNode::new(new_env.clone(), in_expression.clone());
+        writer.show_rule_with_premise2(
+            self.environment.clone(),
+            self.expression.clone().to_string(),
+            in_expression.get_val(new_env).to_string(),
+            "E-Let".to_string(),
+            let_premise,
+            in_premise,
+        )
+    }
+}
 
-        let _ = let_premise.show(w, depth + 2, false);
-        let _ = write!(w, ";\n");
+pub struct RuleWriter<W> {
+    w: W,
+    depth: usize,
+}
+impl<W: Write> RuleWriter<W> {
+    pub fn new(w: W, depth: usize) -> RuleWriter<W> {
+        RuleWriter { w, depth }
+    }
 
-        let _ = in_premise.show(w, depth + 2, true);
-        let nl = if with_newline { "\n" } else { "" };
-        write!(w, "{}}}{}", get_depth_space(depth), nl)
+    pub fn write_nl(&mut self) {
+        let _ = write!(self.w, "\n");
+    }
+
+    fn inc_depth(&mut self) {
+        self.depth += 2;
+    }
+    fn dec_depth(&mut self) {
+        self.depth -= 2;
+    }
+
+    pub fn show_rule_without_premise(
+        &mut self,
+        environment: Option<Environment>,
+        expression_str: String,
+        evalto_str: String,
+        rule_str: String,
+        is_bnode: bool,
+    ) -> io::Result<()> {
+        let environment_str = match environment.clone() {
+            Some(env) => env.to_string(),
+            None => "".to_string(),
+        };
+        let eq_str = if is_bnode { "is" } else { "evalto" };
+        write!(
+            self.w,
+            "{}{}{} {} {} by {} {{}}",
+            get_depth_space(self.depth),
+            environment_str,
+            expression_str,
+            eq_str.to_string(),
+            evalto_str,
+            rule_str,
+        )
+    }
+
+    pub fn show_rule_with_premise(
+        &mut self,
+        environment: Environment,
+        expression_str: String,
+        evalto_str: String,
+        rule_str: String,
+        premise: RuleNode,
+    ) -> io::Result<()> {
+        let _ = write!(
+            self.w,
+            "{}{}{} evalto {} by {} {{\n",
+            get_depth_space(self.depth),
+            environment.clone().to_string(),
+            expression_str,
+            evalto_str,
+            rule_str,
+        );
+        self.inc_depth();
+        let _ = premise.show(self);
+        let _ = write!(self.w, "\n");
+        self.dec_depth();
+        write!(self.w, "{}}}", get_depth_space(self.depth))
+    }
+
+    pub fn show_rule_with_premise2(
+        &mut self,
+        environment: Environment,
+        expression_str: String,
+        evalto_str: String,
+        rule_str: String,
+        premise1: RuleNode,
+        premise2: RuleNode,
+    ) -> io::Result<()> {
+        let _ = write!(
+            self.w,
+            "{}{}{} evalto {} by {} {{\n",
+            get_depth_space(self.depth),
+            environment.clone().to_string(),
+            expression_str,
+            evalto_str,
+            rule_str,
+        );
+        self.inc_depth();
+        let _ = premise1.show(self);
+        let _ = write!(self.w, ";\n");
+        let _ = premise2.show(self);
+        let _ = write!(self.w, "\n");
+        self.dec_depth();
+        write!(self.w, "{}}}", get_depth_space(self.depth))
+    }
+
+    pub fn show_rule_with_premise3(
+        &mut self,
+        environment: Environment,
+        expression_str: String,
+        evalto_str: String,
+        rule_str: String,
+        premise1: RuleNode,
+        premise2: RuleNode,
+        premise: BOpNode,
+    ) -> io::Result<()> {
+        let _ = write!(
+            self.w,
+            "{}{}{} evalto {} by {} {{\n",
+            get_depth_space(self.depth),
+            environment.clone().to_string(),
+            expression_str,
+            evalto_str,
+            rule_str,
+        );
+        self.inc_depth();
+        let _ = premise1.show(self);
+        let _ = write!(self.w, ";\n");
+        let _ = premise2.show(self);
+        let _ = write!(self.w, ";\n");
+        let _ = premise.show(self);
+        let _ = write!(self.w, "\n");
+        self.dec_depth();
+        write!(self.w, "{}}}", get_depth_space(self.depth))
     }
 }

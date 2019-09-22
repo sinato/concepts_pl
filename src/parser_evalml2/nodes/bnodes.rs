@@ -1,4 +1,4 @@
-use super::super::nodes::get_depth_space;
+use super::enodes::RuleWriter;
 use std::io::{self, Write};
 
 #[derive(Debug, Clone)]
@@ -8,25 +8,21 @@ pub struct BOpNode {
     pub op: String,
 }
 impl BOpNode {
-    pub fn show<W: Write>(self, w: &mut W, depth: usize, with_newline: bool) -> io::Result<()> {
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         match self.op.as_ref() {
-            "+" => write!(
-                w,
-                "{}{} plus {} is {} by B-Plus {{}}{}",
-                get_depth_space(depth),
-                self.i1,
-                self.i2,
-                self.i1 + self.i2,
-                if with_newline { "\n" } else { "" }
+            "+" => writer.show_rule_without_premise(
+                None,
+                self.i1.to_string() + " plus " + &self.i2.to_string(),
+                (self.i1 + self.i2).to_string(),
+                "B-Plus".to_string(),
+                true,
             ),
-            "*" => write!(
-                w,
-                "{}{} times {} is {} by B-Times {{}}{}",
-                get_depth_space(depth),
-                self.i1,
-                self.i2,
-                self.i1 * self.i2,
-                if with_newline { "\n" } else { "" }
+            "*" => writer.show_rule_without_premise(
+                None,
+                self.i1.to_string() + " times " + &self.i2.to_string(),
+                (self.i1 * self.i2).to_string(),
+                "B-Times".to_string(),
+                true,
             ),
             _ => panic!("todo"),
         }
