@@ -53,7 +53,7 @@ impl Term {
             Term::Val(num) => Value::Num(num),
             Term::Var(identifier) => environment.get_val(identifier),
             Term::If(if_term) => panic!("todo"),
-            Term::Let(let_term) => panic!("todo"),
+            Term::Let(let_term) => let_term.get_val(environment),
         }
     }
 
@@ -78,4 +78,21 @@ pub struct IfTerm {
 pub struct LetTerm {
     pub let_expression: LetExpression,
     pub in_expression: Expression,
+}
+impl LetTerm {
+    pub fn get_val(self, environment: Environment) -> Value {
+        let mut new_env = environment.clone();
+        let new_val = Some(
+            self.let_expression
+                .expression
+                .clone()
+                .get_val(environment.clone()),
+        );
+        match self.let_expression.identifier.as_ref() {
+            "x" => new_env.x = new_val,
+            "y" => new_env.y = new_val,
+            _ => panic!("unexpected identifier"),
+        }
+        self.in_expression.get_val(new_env)
+    }
 }

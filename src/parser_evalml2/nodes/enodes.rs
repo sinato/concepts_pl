@@ -162,7 +162,6 @@ impl ELetNode {
     pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
         let in_expression = self.term.clone().in_expression;
         let let_expression = self.term.clone().let_expression;
-
         let mut new_env = self.environment.clone();
         let val = Some(
             let_expression
@@ -180,7 +179,7 @@ impl ELetNode {
         writer.show_rule(
             Some(self.environment.clone()),
             self.expression.clone().to_string(),
-            in_expression.get_val(new_env).to_string(),
+            self.term.get_val(self.environment).to_string(),
             "E-Let".to_string(),
             false,
             Some(let_premise),
