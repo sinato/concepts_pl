@@ -1,7 +1,7 @@
 use super::super::environment::Environment;
 use super::super::expression::Expression;
 use super::super::nodes::RuleNode;
-use super::super::terms::{FunTerm, IfTerm, LetTerm, Term};
+use super::super::terms::{AppTerm, FunTerm, IfTerm, LetTerm, Term};
 use super::super::value::Value;
 use super::bnodes::BOpNode;
 use super::writer::RuleWriter;
@@ -96,11 +96,11 @@ impl EBNode {
         let premise1 = RuleNode::new(self.environment.clone(), former);
         let premise2 = RuleNode::new(self.environment.clone(), latter);
 
-        let premise = BOpNode {
+        let premise = RuleNode::BOp(BOpNode {
             i1,
             i2,
             op: operator.clone(),
-        };
+        });
         let (val_str, rule_str) = match operator.as_ref() {
             "+" => ((i1 + i2).to_string(), "E-Plus".to_string()),
             "*" => ((i1 * i2).to_string(), "E-Times".to_string()),
@@ -196,6 +196,39 @@ impl EFunNode {
             None,
             None,
             None,
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EAppNode {
+    pub environment: Environment,
+    pub expression: Expression,
+    pub term: AppTerm,
+}
+impl EAppNode {
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
+        let (fun_term, mut clojure_env) = self.term.get_fun_info(self.environment.clone());
+
+        let terms: Vec<(String, Term)> = vec![("".to_string(), *self.term.clone().function)];
+        let premise1 = RuleNode::new(self.environment.clone(), Expression { terms });
+
+        let premise2 = RuleNode::new(self.environment.clone(), self.term.clone().argument);
+        let parameter: String = fun_term.parameter;
+        clojure_env.set_val(
+            parameter,
+            self.term.clone().argument.get_val(self.environment.clone()),
+        );
+        let premise3 = RuleNode::new(clojure_env, fun_term.function_body);
+        writer.show_rule(
+            Some(self.environment.clone()),
+            self.term.clone().to_string(&self.environment),
+            self.term.get_val(self.environment).to_string(),
+            "E-App".to_string(),
+            false,
+            Some(premise1),
+            Some(premise2),
+            Some(premise3),
         )
     }
 }

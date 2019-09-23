@@ -1,6 +1,7 @@
 use super::environment::Environment;
 use super::expression::Expression;
-use super::nodes::enodes::{EBNode, EFunNode, EIfNode, ELetNode, EValNode, EVarNode};
+use super::nodes::bnodes::BOpNode;
+use super::nodes::enodes::{EAppNode, EBNode, EFunNode, EIfNode, ELetNode, EValNode, EVarNode};
 use super::nodes::writer::RuleWriter;
 use super::terms::Term;
 use std::io::{self, Write};
@@ -17,6 +18,8 @@ pub enum RuleNode {
     ELet(ELetNode),
     EBNode(EBNode),
     EFun(EFunNode),
+    EApp(EAppNode),
+    BOp(BOpNode),
 }
 
 impl RuleNode {
@@ -49,6 +52,11 @@ impl RuleNode {
                     expression: original_expression,
                     term: fun_node,
                 }),
+                Term::App(app_node) => RuleNode::EApp(EAppNode {
+                    environment,
+                    expression: original_expression,
+                    term: app_node,
+                }),
             }
         } else {
             RuleNode::EBNode(EBNode {
@@ -65,6 +73,8 @@ impl RuleNode {
             RuleNode::ELet(node) => node.show(writer),
             RuleNode::EBNode(node) => node.show(writer),
             RuleNode::EFun(node) => node.show(writer),
+            RuleNode::EApp(node) => node.show(writer),
+            RuleNode::BOp(node) => node.show(writer),
         }
     }
 }

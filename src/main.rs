@@ -5,7 +5,7 @@ use concepts_pl::parser_evalml3::derive;
 use std::io;
 
 fn main() {
-    let judgement = "|- let y = 2 in func x -> x + y evalto (y=2)[fun x -> x + y]";
+    let judgement = "|- let sq = fun x -> x * x in sq 3 + sq 4 evalto 25";
 
     println!("judgement ========================");
     println!("{}", judgement);

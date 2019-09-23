@@ -22,11 +22,12 @@ pub fn derive<W: Write>(judgement: &str, w: &mut W) {
     tokens.pop(); // consume |-
     let expression = Expression::new(&mut tokens);
     println!("++++++++++++++++++++++");
-    println!("expression: {:?}", expression);
+    dbg!(expression.clone());
+    println!("++++++++++++++++++++++");
     println!("++++++++++++++++++++++");
     let derivation_tree = RuleNode::new(environment, expression);
     println!("++++++++++++++++++++++");
-    println!("derivation_tree: {:?}", derivation_tree);
+    dbg!(derivation_tree.clone());
     println!("++++++++++++++++++++++");
     let mut writer = RuleWriter::new(w, 0);
     let _ = derivation_tree.show(&mut writer);

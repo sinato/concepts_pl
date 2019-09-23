@@ -1,6 +1,5 @@
 use super::super::environment::Environment;
 use super::super::nodes::{get_depth_space, RuleNode};
-use super::bnodes::BOpNode;
 
 use std::io::{self, Write};
 
@@ -33,7 +32,7 @@ impl<W: Write> RuleWriter<W> {
         is_bnode: bool,
         premise1: Option<RuleNode>,
         premise2: Option<RuleNode>,
-        premise3: Option<BOpNode>,
+        premise3: Option<RuleNode>,
     ) -> io::Result<()> {
         let environment_str = match environment.clone() {
             Some(env) => env.to_string(),

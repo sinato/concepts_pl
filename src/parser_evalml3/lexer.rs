@@ -110,7 +110,7 @@ impl Lexer {
             ("ELSE", r"else"),
             ("LET", r"let"),
             ("IN", r"in"),
-            ("VAR", r"(x|y)"),
+            ("VAR", r"(x|y|sq)"),
             ("EVAL", r"evalto"),
         ];
         let re = make_regex(&token_patterns);

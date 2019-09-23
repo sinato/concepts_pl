@@ -10,6 +10,7 @@ pub enum Term {
     If(IfTerm),
     Let(LetTerm),
     Fun(FunTerm),
+    App(AppTerm),
 }
 impl Term {
     pub fn new(tokens: &mut Tokens) -> Term {
@@ -18,9 +19,24 @@ impl Term {
                 let num: i32 = tokens.consume_num();
                 Term::Val(num)
             }
-            Token::Var(_) => {
-                let var: String = tokens.consume_var();
-                Term::Var(var)
+            Token::Var(variable) => {
+                // assumes that function name is not (x or y)
+                match variable.as_ref() {
+                    "x" | "y" => {
+                        // not function variable
+                        let var: String = tokens.consume_var();
+                        Term::Var(var)
+                    }
+                    _ => {
+                        // function variable
+                        let function = Box::new(Term::Var(tokens.consume_var()));
+                        let num = tokens.consume_num();
+                        let terms: Vec<(String, Term)> = vec![("".to_string(), Term::Val(num))];
+                        let argument = Expression { terms };
+
+                        Term::App(AppTerm { function, argument })
+                    }
+                }
             }
             Token::IF => {
                 tokens.pop(); // consume if
@@ -66,13 +82,23 @@ impl Term {
             Term::If(_if_term) => panic!("todo"),
             Term::Let(let_term) => let_term.get_val(environment),
             Term::Fun(fun_term) => fun_term.get_val(environment),
+            Term::App(app_term) => app_term.get_val(environment),
         }
     }
-
     pub fn get_identifier(self) -> String {
         match self {
             Term::Var(identifier) => identifier,
             _ => panic!("unexpected"),
+        }
+    }
+    pub fn to_string(&self, environment: &Environment) -> String {
+        match self {
+            Term::Val(num) => num.to_string(),
+            Term::Var(identifier) => identifier.clone(),
+            Term::If(if_term) => if_term.to_string(environment),
+            Term::Let(let_term) => let_term.to_string(environment),
+            Term::Fun(fun_term) => fun_term.to_string(environment),
+            Term::App(app_term) => app_term.to_string(environment),
         }
     }
 }
@@ -82,6 +108,16 @@ pub struct IfTerm {
     pub condition_expression: Expression,
     pub then_expression: Expression,
     pub else_expression: Expression,
+}
+impl IfTerm {
+    pub fn to_string(&self, environment: &Environment) -> String {
+        format!(
+            "if {} then {} else {}",
+            self.condition_expression.to_string(environment),
+            self.then_expression.to_string(environment),
+            self.else_expression.to_string(environment)
+        )
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +131,13 @@ impl LetTerm {
         let new_val = self.let_expression.expression.get_val(environment);
         new_env.set_val(self.let_expression.identifier, new_val);
         self.in_expression.get_val(new_env)
+    }
+    pub fn to_string(&self, environment: &Environment) -> String {
+        format!(
+            "let {} in {}",
+            self.let_expression.to_string(&environment),
+            self.in_expression.to_string(&environment)
+        )
     }
 }
 
@@ -112,6 +155,42 @@ impl FunTerm {
             "fun {} -> {}",
             self.parameter,
             self.function_body.to_string(environment)
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct AppTerm {
+    pub function: Box<Term>,
+    pub argument: Expression,
+}
+impl AppTerm {
+    pub fn get_val(self, environment: Environment) -> Value {
+        let function_name = self.function.get_identifier();
+        let value: Value = environment.get_val(&function_name);
+        match value {
+            Value::Fun(fun_term, mut clojure_env) => {
+                let parameter: String = fun_term.parameter;
+                clojure_env.set_val(parameter, self.argument.get_val(environment));
+                let expression: Expression = fun_term.function_body;
+                expression.get_val(clojure_env)
+            }
+            _ => panic!("unexpected"),
+        }
+    }
+    pub fn get_fun_info(&self, environment: Environment) -> (FunTerm, Environment) {
+        let function_name = self.function.clone().get_identifier();
+        let value: Value = environment.get_val(&function_name);
+        match value {
+            Value::Fun(fun_term, env) => (fun_term, env),
+            _ => panic!("unexpected"),
+        }
+    }
+    pub fn to_string(&self, environment: &Environment) -> String {
+        format!(
+            "{} {}",
+            self.function.clone().get_identifier(),
+            self.argument.to_string(environment)
         )
     }
 }

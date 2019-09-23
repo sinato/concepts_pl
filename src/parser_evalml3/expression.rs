@@ -22,7 +22,7 @@ impl LetExpression {
     }
 }
 impl LetExpression {
-    pub fn to_string(self, environment: &Environment) -> String {
+    pub fn to_string(&self, environment: &Environment) -> String {
         let mut s = "".to_string();
         s += &self.identifier;
         s += " = ";
@@ -88,26 +88,7 @@ impl Expression {
         for t in self.terms.clone() {
             let (operator, term) = t;
             s = add_op(operator, s);
-            match term {
-                Term::Val(num) => s += &num.to_string(),
-                Term::Var(identifier) => s += &identifier,
-                Term::If(if_term) => {
-                    s += &format!(
-                        "if {} then {} else {}",
-                        if_term.condition_expression.to_string(environment),
-                        if_term.then_expression.to_string(environment),
-                        if_term.else_expression.to_string(environment)
-                    )
-                }
-                Term::Let(let_term) => {
-                    s += &format!(
-                        "let {} in {}",
-                        let_term.let_expression.to_string(environment),
-                        let_term.in_expression.to_string(environment)
-                    )
-                }
-                Term::Fun(fun_term) => s += &fun_term.to_string(environment),
-            }
+            s += &term.to_string(environment);
         }
         s
     }
