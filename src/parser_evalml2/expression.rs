@@ -77,6 +77,7 @@ impl Expression {
             match operator.as_ref() {
                 "+" => former_val + latter_val,
                 "*" => former_val * latter_val,
+                "-" => former_val - latter_val,
                 _ => panic!(""),
             }
         }

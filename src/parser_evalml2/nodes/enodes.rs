@@ -104,6 +104,7 @@ impl EBNode {
         let (val_str, rule_str) = match operator.as_ref() {
             "+" => ((i1 + i2).to_string(), "E-Plus".to_string()),
             "*" => ((i1 * i2).to_string(), "E-Times".to_string()),
+            "-" => ((i1 - i2).to_string(), "E-Minus".to_string()),
             _ => panic!("todo"),
         };
         writer.show_rule(

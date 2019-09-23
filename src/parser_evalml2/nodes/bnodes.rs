@@ -30,6 +30,16 @@ impl BOpNode {
                 None,
                 None,
             ),
+            "-" => writer.show_rule(
+                None,
+                self.i1.to_string() + " minus " + &self.i2.to_string(),
+                (self.i1 - self.i2).to_string(),
+                "B-Minus".to_string(),
+                true,
+                None,
+                None,
+                None,
+            ),
             _ => panic!("todo"),
         }
     }
