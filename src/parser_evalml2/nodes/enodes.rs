@@ -18,26 +18,21 @@ impl EVarNode {
         let mut terms = self.expression.terms.clone();
         let (_, term) = terms.pop().expect("");
         let identifier = term.get_identifier();
-        let mut rule_str = "E-Var1".to_string();
 
-        let premise = match self.environment.get_num() {
-            2 => match identifier.as_ref() {
-                "x" => {
-                    let mut new_env = self.environment.clone();
-                    new_env.y = None;
-                    rule_str = "E-Var2".to_string();
-                    Some(RuleNode::new(new_env, self.expression))
-                }
-                "y" => None,
-                _ => panic!("unexpected"),
-            },
-            1 => None,
-            _ => panic!("unexpected"),
+        let (premise, rule_str) = if self.environment.get_match_loc(&identifier) == 0 {
+            (None, "E-Var1".to_string())
+        } else {
+            let mut new_env = self.environment.clone();
+            new_env.pop_val();
+            (
+                Some(RuleNode::new(new_env, self.expression)),
+                "E-Var2".to_string(),
+            )
         };
         writer.show_rule(
             Some(self.environment.clone()),
             identifier.clone(),
-            self.environment.get_val(identifier).to_string(),
+            self.environment.get_val(&identifier).to_string(),
             rule_str,
             false,
             premise,
@@ -163,17 +158,11 @@ impl ELetNode {
         let in_expression = self.term.clone().in_expression;
         let let_expression = self.term.clone().let_expression;
         let mut new_env = self.environment.clone();
-        let val = Some(
-            let_expression
-                .expression
-                .clone()
-                .get_val(self.environment.clone()),
-        );
-        match let_expression.identifier.as_ref() {
-            "x" => new_env.x = val,
-            "y" => new_env.y = val,
-            _ => panic!("unexpected identifier"),
-        }
+        let val = let_expression
+            .expression
+            .clone()
+            .get_val(self.environment.clone());
+        new_env.set_val(let_expression.identifier, val);
         let let_premise = RuleNode::new(self.environment.clone(), let_expression.expression);
         let in_premise = RuleNode::new(new_env.clone(), in_expression.clone());
         writer.show_rule(

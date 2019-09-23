@@ -19,6 +19,7 @@ pub fn derive<W: Write>(judgement: &str, w: &mut W) {
     dbg!(&tokens);
 
     let environment = Environment::new(&mut tokens);
+    tokens.pop(); // consume |-
     let expression = Expression::new(&mut tokens);
     println!("++++++++++++++++++++++");
     println!("expression: {:?}", expression);

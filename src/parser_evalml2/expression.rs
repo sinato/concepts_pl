@@ -12,24 +12,12 @@ pub struct LetExpression {
 }
 impl LetExpression {
     pub fn new(tokens: &mut Tokens) -> LetExpression {
-        match tokens.peek().expect("") {
-            Token::XEQ => {
-                tokens.pop(); // consume x =
-                let expression = Expression::new(tokens);
-                LetExpression {
-                    identifier: String::from("x"),
-                    expression,
-                }
-            }
-            Token::YEQ => {
-                tokens.pop(); // consume y =
-                let expression = Expression::new(tokens);
-                LetExpression {
-                    identifier: String::from("y"),
-                    expression,
-                }
-            }
-            _ => panic!("todo"),
+        let identifier = tokens.consume_var();
+        tokens.pop(); // consume =
+        let expression = Expression::new(tokens);
+        LetExpression {
+            identifier,
+            expression,
         }
     }
 }
