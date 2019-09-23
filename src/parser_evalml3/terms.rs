@@ -7,6 +7,7 @@ use super::value::Value;
 pub enum Term {
     Val(i32),
     Var(String),
+    Paren(Expression),
     If(IfTerm),
     Let(LetTerm),
     Fun(FunTerm),
@@ -30,13 +31,22 @@ impl Term {
                     _ => {
                         // function variable
                         let function = Box::new(Term::Var(tokens.consume_var()));
-                        let num = tokens.consume_num();
-                        let terms: Vec<(String, Term)> = vec![("".to_string(), Term::Val(num))];
+
+                        println!("function argument: {:?}", tokens);
+
+                        let term = Term::new(tokens);
+                        let terms: Vec<(String, Term)> = vec![("".to_string(), term];
                         let argument = Expression { terms };
 
                         Term::App(AppTerm { function, argument })
                     }
                 }
+            }
+            Token::PS => {
+                tokens.pop(); // consume (
+                let expression = Expression::new(tokens);
+                tokens.pop(); // consume )
+                Term::Paren(expression)
             }
             Token::IF => {
                 tokens.pop(); // consume if
@@ -79,6 +89,7 @@ impl Term {
         match self {
             Term::Val(num) => Value::Num(num),
             Term::Var(identifier) => environment.get_val(&identifier),
+            Term::Paren(expression) => expression.get_val(environment),
             Term::If(_if_term) => panic!("todo"),
             Term::Let(let_term) => let_term.get_val(environment),
             Term::Fun(fun_term) => fun_term.get_val(environment),
@@ -95,6 +106,7 @@ impl Term {
         match self {
             Term::Val(num) => num.to_string(),
             Term::Var(identifier) => identifier.clone(),
+            Term::Paren(expression) => format!("({})", expression.to_string(environment)),
             Term::If(if_term) => if_term.to_string(environment),
             Term::Let(let_term) => let_term.to_string(environment),
             Term::Fun(fun_term) => fun_term.to_string(environment),

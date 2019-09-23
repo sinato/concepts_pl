@@ -38,6 +38,7 @@ impl RuleNode {
                     environment,
                     expression: original_expression,
                 }),
+                Term::Paren(expression) => RuleNode::new(environment, expression),
                 Term::Val(_) => RuleNode::EVal(EValNode {
                     environment,
                     expression: original_expression,

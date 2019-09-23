@@ -166,10 +166,12 @@ impl ELetNode {
         new_env.set_val(let_expression.identifier, val);
         let let_premise = RuleNode::new(self.environment.clone(), let_expression.expression);
         let in_premise = RuleNode::new(new_env.clone(), in_expression.clone());
+        let val = self.term.get_val(self.environment.clone()).to_string();
+
         writer.show_rule(
             Some(self.environment.clone()),
             self.expression.clone().to_string(&self.environment),
-            self.term.get_val(self.environment).to_string(),
+            val,
             "E-Let".to_string(),
             false,
             Some(let_premise),
