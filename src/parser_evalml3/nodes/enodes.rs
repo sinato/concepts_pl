@@ -1,7 +1,7 @@
 use super::super::environment::Environment;
 use super::super::expression::Expression;
 use super::super::nodes::RuleNode;
-use super::super::terms::{IfTerm, LetTerm, Term};
+use super::super::terms::{FunTerm, IfTerm, LetTerm, Term};
 use super::super::value::Value;
 use super::bnodes::BOpNode;
 use super::writer::RuleWriter;
@@ -58,8 +58,8 @@ impl EIfNode {
             .clone()
             .get_val(self.environment.clone())
         {
-            Value::Num(_) => panic!("unexpected"),
             Value::Bool(b) => b,
+            _ => panic!("unexpected"),
         };
 
         if flag == String::from("true") {
@@ -67,7 +67,7 @@ impl EIfNode {
             let then_premise = RuleNode::new(self.environment.clone(), then_expression.clone());
             writer.show_rule(
                 Some(self.environment.clone()),
-                self.expression.clone().to_string(),
+                self.expression.clone().to_string(&self.environment),
                 then_expression.get_val(self.environment).to_string(),
                 "E-IfT".to_string(),
                 false,
@@ -108,8 +108,8 @@ impl EBNode {
             _ => panic!("todo"),
         };
         writer.show_rule(
-            Some(self.environment),
-            self.expression.to_string(),
+            Some(self.environment.clone()),
+            self.expression.to_string(&self.environment),
             val_str,
             rule_str,
             false,
@@ -132,7 +132,7 @@ impl EValNode {
         match term {
             Term::Val(_) => writer.show_rule(
                 Some(self.environment.clone()),
-                self.expression.clone().to_string(),
+                self.expression.clone().to_string(&self.environment),
                 self.expression
                     .get_val(self.environment)
                     .get_num()
@@ -168,12 +168,33 @@ impl ELetNode {
         let in_premise = RuleNode::new(new_env.clone(), in_expression.clone());
         writer.show_rule(
             Some(self.environment.clone()),
-            self.expression.clone().to_string(),
+            self.expression.clone().to_string(&self.environment),
             self.term.get_val(self.environment).to_string(),
             "E-Let".to_string(),
             false,
             Some(let_premise),
             Some(in_premise),
+            None,
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EFunNode {
+    pub environment: Environment,
+    pub expression: Expression,
+    pub term: FunTerm,
+}
+impl EFunNode {
+    pub fn show<W: Write>(self, writer: &mut RuleWriter<W>) -> io::Result<()> {
+        writer.show_rule(
+            Some(self.environment.clone()),
+            self.term.clone().to_string(&self.environment),
+            self.term.get_val(self.environment).to_string(),
+            "E-Fun".to_string(),
+            false,
+            None,
+            None,
             None,
         )
     }

@@ -1,15 +1,24 @@
+use super::environment::Environment;
+use super::terms::FunTerm;
+
 use std::ops::{Add, Mul, Sub};
 
 #[derive(Debug, Clone)]
 pub enum Value {
     Num(i32),
     Bool(String),
+    Fun(FunTerm, Environment),
 }
 impl Value {
     pub fn to_string(&self) -> String {
         match self {
             Value::Num(num) => num.to_string(),
             Value::Bool(b) => b.to_string(),
+            Value::Fun(term, environment) => format!(
+                "({})[{}]",
+                environment.clone().to_string_for_clojure(),
+                term.to_string(environment)
+            ),
         }
     }
     pub fn get_num(self) -> i32 {

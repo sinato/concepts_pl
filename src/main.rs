@@ -1,11 +1,11 @@
 extern crate concepts_pl;
 
-use concepts_pl::parser_evalml2::derive;
+use concepts_pl::parser_evalml3::derive;
 
 use std::io;
 
 fn main() {
-    let judgement = "|- let x = let y = 3 - 2 in y * y in let y = 4 in x + y evalto 5";
+    let judgement = "|- fun x -> x + 1 evalto ()[fun x -> x + 1]";
 
     println!("judgement ========================");
     println!("{}", judgement);

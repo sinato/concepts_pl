@@ -9,6 +9,7 @@ pub enum Term {
     Var(String),
     If(IfTerm),
     Let(LetTerm),
+    Fun(FunTerm),
 }
 impl Term {
     pub fn new(tokens: &mut Tokens) -> Term {
@@ -44,6 +45,16 @@ impl Term {
                     in_expression,
                 })
             }
+            Token::FUN => {
+                tokens.pop(); // consume fun
+                let parameter: String = tokens.consume_var();
+                tokens.pop(); // consume ->
+                let function_body = Expression::new(tokens);
+                Term::Fun(FunTerm {
+                    parameter,
+                    function_body,
+                })
+            }
             _ => panic!("todo"),
         }
     }
@@ -54,15 +65,14 @@ impl Term {
             Term::Var(identifier) => environment.get_val(&identifier),
             Term::If(_if_term) => panic!("todo"),
             Term::Let(let_term) => let_term.get_val(environment),
+            Term::Fun(fun_term) => fun_term.get_val(environment),
         }
     }
 
     pub fn get_identifier(self) -> String {
         match self {
-            Term::Val(_) => panic!("unexpected"),
             Term::Var(identifier) => identifier,
-            Term::If(_) => panic!("unexpected"),
-            Term::Let(_) => panic!("unexpected"),
+            _ => panic!("unexpected"),
         }
     }
 }
@@ -85,5 +95,23 @@ impl LetTerm {
         let new_val = self.let_expression.expression.get_val(environment);
         new_env.set_val(self.let_expression.identifier, new_val);
         self.in_expression.get_val(new_env)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FunTerm {
+    pub parameter: String,
+    pub function_body: Expression,
+}
+impl FunTerm {
+    pub fn get_val(self, environment: Environment) -> Value {
+        Value::Fun(self, environment)
+    }
+    pub fn to_string(&self, environment: &Environment) -> String {
+        format!(
+            "fun {} -> {}",
+            self.parameter,
+            self.function_body.to_string(environment)
+        )
     }
 }

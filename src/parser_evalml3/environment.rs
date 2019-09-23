@@ -87,4 +87,19 @@ impl Environment {
             s + " |- "
         }
     }
+
+    pub fn to_string_for_clojure(self) -> String {
+        if self.stack.len() == 0 {
+            String::from("")
+        } else {
+            let mut s = "".to_string();
+            for (i, (var, val)) in self.stack.iter().enumerate() {
+                if i != 0 {
+                    s += ", ";
+                }
+                s += &format!("{}={}", var, val.to_string());
+            }
+            s
+        }
+    }
 }

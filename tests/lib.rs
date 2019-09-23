@@ -312,3 +312,10 @@ fn test_question039() {
     let expect = "tests/expects/question039";
     run_test_evalml(judgement, expect, EvalMLVersion::V2);
 }
+
+#[test]
+fn test_question040() {
+    let judgement = "|- fun x -> x + 1 evalto ()[fun x -> x + 1]";
+    let expect = "tests/expects/question040";
+    run_test_evalml(judgement, expect, EvalMLVersion::V3);
+}
